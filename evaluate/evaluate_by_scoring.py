@@ -8,11 +8,11 @@ import json
 import numpy as np
 from tqdm import tqdm
 
-from hyperrag.llm import groq_mistral_complete_sync
+from hyperrag.llm import openrouter_mistral_complete_sync
 
 
 def llm_model_func(prompt, system_prompt=None, history_messages=None, **kwargs) -> str:
-    return groq_mistral_complete_sync(
+    return openrouter_mistral_complete_sync(
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages or [],

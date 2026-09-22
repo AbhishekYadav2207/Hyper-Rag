@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# GROQ - PRIMARY LLM
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_API_KEY = "YOUR_GROQ_KEY"
-GROQ_MODEL = "openai/gpt-oss-120b"
+# OPENROUTER - PRIMARY LLM
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_API_KEY = "YOUR_OPENROUTER_KEY"
+OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 # MISTRAL - FALLBACK LLM
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"

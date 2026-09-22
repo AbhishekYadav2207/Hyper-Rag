@@ -10,7 +10,7 @@ from hyperrag import HyperRAG
 from hyperrag.utils import EmbeddingFunc
 from hyperrag.llm import (
     openai_embedding,
-    groq_mistral_complete_if_cache,
+    openrouter_mistral_complete_if_cache,
 )
 
 from my_config import EMB_API_KEY, EMB_BASE_URL, EMB_MODEL, EMB_DIM
@@ -22,7 +22,7 @@ async def llm_model_func(
     history_messages=None,
     **kwargs,
 ) -> str:
-    return await groq_mistral_complete_if_cache(
+    return await openrouter_mistral_complete_if_cache(
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages or [],

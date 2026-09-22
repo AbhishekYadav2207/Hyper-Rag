@@ -27,9 +27,9 @@ from tenacity import (
 )
 
 from my_config import (
-    GROQ_BASE_URL,
-    GROQ_API_KEY,
-    GROQ_MODEL,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_API_KEY,
+    OPENROUTER_MODEL,
     MISTRAL_BASE_URL,
     MISTRAL_API_KEY,
     MISTRAL_MODEL,
@@ -96,32 +96,32 @@ async def openai_complete_if_cache(
     return response.choices[0].message.content
 
 
-async def groq_mistral_complete_if_cache(
+async def openrouter_mistral_complete_if_cache(
     prompt,
     system_prompt=None,
     history_messages=None,
     **kwargs,
 ) -> str:
     """
-    Primary LLM: Groq (GROQ_MODEL, GROQ_BASE_URL)
+    Primary LLM: OpenRouter (OPENROUTER_MODEL, OPENROUTER_BASE_URL)
     Fallback LLM: Mistral (MISTRAL_MODEL, MISTRAL_BASE_URL)
     Preserves caching and retry logic via openai_complete_if_cache.
     """
     history = history_messages if history_messages is not None else []
 
-    # 1) Try Groq (Primary)
+    # 1) Try OpenRouter (Primary)
     try:
         return await openai_complete_if_cache(
-            model=GROQ_MODEL,
+            model=OPENROUTER_MODEL,
             prompt=prompt,
             system_prompt=system_prompt,
             history_messages=history,
-            api_key=GROQ_API_KEY,
-            base_url=GROQ_BASE_URL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
             **kwargs.copy(),
         )
-    except Exception as groq_error:
-        msg = f"[Groq failed] {type(groq_error).__name__}: {groq_error}\n[Fallback] Switching to Mistral..."
+    except Exception as openrouter_error:
+        msg = f"[OpenRouter failed] {type(openrouter_error).__name__}: {openrouter_error}\n[Fallback] Switching to Mistral..."
         logger.warning(msg)
         print(msg, flush=True)
 
@@ -138,8 +138,12 @@ async def groq_mistral_complete_if_cache(
         )
     except Exception as mistral_error:
         raise RuntimeError(
-            f"Both Groq primary LLM and Mistral fallback LLM failed. Mistral error: {mistral_error}"
+            f"Both OpenRouter primary LLM and Mistral fallback LLM failed. Mistral error: {mistral_error}"
         ) from mistral_error
+
+
+# Backwards compatibility alias
+groq_mistral_complete_if_cache = openrouter_mistral_complete_if_cache
 
 
 async def openai_complete_stream_if_cache(
@@ -207,7 +211,7 @@ async def openai_complete_stream_if_cache(
         await hashing_kv.upsert({args_hash: {"return": text, "model": model}})
 
 
-async def groq_mistral_stream_if_cache(
+async def openrouter_mistral_stream_if_cache(
     prompt,
     system_prompt=None,
     history_messages=None,
@@ -215,23 +219,23 @@ async def groq_mistral_stream_if_cache(
     **kwargs,
 ):
     """
-    Streaming LLM routing: Groq first, Mistral fallback.
-    - If Groq fails BEFORE producing output, falls back to Mistral.
-    - If Groq has already emitted part of the response, does NOT append Mistral response.
+    Streaming LLM routing: OpenRouter first, Mistral fallback.
+    - If OpenRouter fails BEFORE producing output, falls back to Mistral.
+    - If OpenRouter has already emitted part of the response, does NOT append Mistral response.
     - Preserves cache replay and chunked streaming behavior.
     """
     history = history_messages if history_messages is not None else []
     yielded_any = False
-    groq_failed_before_yield = False
+    openrouter_failed_before_yield = False
 
     try:
         async for tok in openai_complete_stream_if_cache(
-            model=GROQ_MODEL,
+            model=OPENROUTER_MODEL,
             prompt=prompt,
             system_prompt=system_prompt,
             history_messages=history,
-            api_key=GROQ_API_KEY,
-            base_url=GROQ_BASE_URL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
             chunk_size=chunk_size,
             **kwargs.copy(),
         ):
@@ -239,22 +243,22 @@ async def groq_mistral_stream_if_cache(
             yield tok
     except Exception as e:
         if not yielded_any:
-            groq_failed_before_yield = True
-            msg = f"[Groq failed] {type(e).__name__}: {e}\n[Fallback] Switching to Mistral..."
+            openrouter_failed_before_yield = True
+            msg = f"[OpenRouter failed] {type(e).__name__}: {e}\n[Fallback] Switching to Mistral..."
             logger.warning(msg)
             print(msg, flush=True)
         else:
             logger.error(
-                f"Groq streaming failed after emitting output ({type(e).__name__}: {e}). "
+                f"OpenRouter streaming failed after emitting output ({type(e).__name__}: {e}). "
                 "Aborting stream to prevent duplicate response."
             )
             print(
-                f"[Groq streaming failed after emitting output] {type(e).__name__}: {e}",
+                f"[OpenRouter streaming failed after emitting output] {type(e).__name__}: {e}",
                 flush=True,
             )
             raise
 
-    if groq_failed_before_yield:
+    if openrouter_failed_before_yield:
         try:
             async for tok in openai_complete_stream_if_cache(
                 model=MISTRAL_MODEL,
@@ -269,18 +273,22 @@ async def groq_mistral_stream_if_cache(
                 yield tok
         except Exception as mistral_err:
             raise RuntimeError(
-                f"Both Groq and Mistral streaming failed. Mistral error: {mistral_err}"
+                f"Both OpenRouter and Mistral streaming failed. Mistral error: {mistral_err}"
             ) from mistral_err
 
 
-def groq_mistral_complete_sync(
+# Backwards compatibility alias
+groq_mistral_stream_if_cache = openrouter_mistral_stream_if_cache
+
+
+def openrouter_mistral_complete_sync(
     prompt,
     system_prompt=None,
     history_messages=None,
     **kwargs,
 ) -> str:
     """
-    Synchronous LLM routing: Groq first, Mistral fallback.
+    Synchronous LLM routing: OpenRouter first, Mistral fallback.
     """
     messages = []
     if system_prompt is not None:
@@ -291,20 +299,20 @@ def groq_mistral_complete_sync(
 
     try:
         client = OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url=GROQ_BASE_URL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
             max_retries=0,
         )
         response = client.chat.completions.create(
-            model=GROQ_MODEL,
+            model=OPENROUTER_MODEL,
             messages=messages,
             **kwargs,
         )
         if not response.choices or response.choices[0].message is None:
-            raise ValueError("Groq returned empty response")
+            raise ValueError("OpenRouter returned empty response")
         return response.choices[0].message.content
-    except Exception as groq_error:
-        msg = f"[Groq failed] {type(groq_error).__name__}: {groq_error}\n[Fallback] Switching to Mistral..."
+    except Exception as openrouter_error:
+        msg = f"[OpenRouter failed] {type(openrouter_error).__name__}: {openrouter_error}\n[Fallback] Switching to Mistral..."
         logger.warning(msg)
         print(msg, flush=True)
 
@@ -324,8 +332,12 @@ def groq_mistral_complete_sync(
         return response.choices[0].message.content
     except Exception as mistral_error:
         raise RuntimeError(
-            f"Both Groq and Mistral synchronous calls failed. Mistral error: {mistral_error}"
+            f"Both OpenRouter and Mistral synchronous calls failed. Mistral error: {mistral_error}"
         ) from mistral_error
+
+
+# Backwards compatibility alias
+groq_mistral_complete_sync = openrouter_mistral_complete_sync
 
 
 @retry(
@@ -465,8 +477,8 @@ async def bedrock_complete_if_cache(
 async def gpt_4o_complete(
     prompt, system_prompt=None, history_messages=None, **kwargs
 ) -> str:
-    """Retained for backwards compatibility: routes to groq_mistral_complete_if_cache"""
-    return await groq_mistral_complete_if_cache(
+    """Retained for backwards compatibility: routes to openrouter_mistral_complete_if_cache"""
+    return await openrouter_mistral_complete_if_cache(
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages,
@@ -477,8 +489,8 @@ async def gpt_4o_complete(
 async def gpt_4o_mini_complete(
     prompt, system_prompt=None, history_messages=None, **kwargs
 ) -> str:
-    """Retained for backwards compatibility: routes to groq_mistral_complete_if_cache"""
-    return await groq_mistral_complete_if_cache(
+    """Retained for backwards compatibility: routes to openrouter_mistral_complete_if_cache"""
+    return await openrouter_mistral_complete_if_cache(
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages,

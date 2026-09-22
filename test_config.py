@@ -12,11 +12,13 @@ def test_configuration():
     # Validate presence
     my_config.validate_config(exit_on_error=True)
 
-    # Check Groq configuration
-    assert my_config.GROQ_BASE_URL, "GROQ_BASE_URL is not set"
-    assert my_config.GROQ_MODEL, "GROQ_MODEL is not set"
-    assert my_config.GROQ_API_KEY and len(my_config.GROQ_API_KEY) > 5, "GROQ_API_KEY is empty or too short"
-    print(f"  [OK] Groq Primary LLM: model={my_config.GROQ_MODEL}, base_url={my_config.GROQ_BASE_URL}, api_key=configured")
+    # Check OpenRouter configuration
+    assert my_config.OPENROUTER_BASE_URL, "OPENROUTER_BASE_URL is not set"
+    assert my_config.OPENROUTER_MODEL == "nvidia/nemotron-3-ultra-550b-a55b:free", (
+        f"OPENROUTER_MODEL expected 'nvidia/nemotron-3-ultra-550b-a55b:free', got '{my_config.OPENROUTER_MODEL}'"
+    )
+    assert my_config.OPENROUTER_API_KEY and len(my_config.OPENROUTER_API_KEY) > 5, "OPENROUTER_API_KEY is empty or too short"
+    print(f"  [OK] OpenRouter Primary LLM: model={my_config.OPENROUTER_MODEL}, base_url={my_config.OPENROUTER_BASE_URL}, api_key=configured")
 
     # Check Mistral fallback configuration
     assert my_config.MISTRAL_BASE_URL, "MISTRAL_BASE_URL is not set"

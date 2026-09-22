@@ -45,7 +45,7 @@ sys.path.append(str(ROOT))
 # =============================================================================
 from hyperrag import HyperRAG, QueryParam  # noqa: E402
 from hyperrag.utils import EmbeddingFunc  # noqa: E402
-from hyperrag.llm import groq_mistral_stream_if_cache  # noqa: E402
+from hyperrag.llm import openrouter_mistral_stream_if_cache  # noqa: E402
 
 from reproduce.Step_3_response_question import llm_model_func, embedding_func  # noqa: E402
 from my_config import EMB_DIM  # noqa: E402
@@ -120,8 +120,8 @@ async def _startup() -> None:
     logger.info("MODE=%s", MODE)
 
     async def llm_model_stream_func(prompt, system_prompt=None, history_messages=None, **kwargs):
-        # 使用 Groq -> Mistral 流式输出
-        async for tok in groq_mistral_stream_if_cache(
+        # 使用 OpenRouter -> Mistral 流式输出
+        async for tok in openrouter_mistral_stream_if_cache(
             prompt=prompt,
             system_prompt=system_prompt,
             history_messages=history_messages or [],
