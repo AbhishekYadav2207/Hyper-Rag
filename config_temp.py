@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 
-LLM_BASE_URL = "xxx"
-LLM_API_KEY = "xxx"
-LLM_MODEL = "gpt-4o-mini"
+# GROQ - PRIMARY LLM
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_API_KEY = "YOUR_GROQ_KEY"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
-EMB_BASE_URL = "xxx"
-EMB_API_KEY = "xxx"
-EMB_MODEL = "text-embedding-3-small"
-EMB_DIM = 1536
+# MISTRAL - FALLBACK LLM
+MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
+MISTRAL_API_KEY = "YOUR_MISTRAL_KEY"
+MISTRAL_MODEL = "open-mistral-7b"
+
+# MISTRAL - EMBEDDINGS
+EMB_BASE_URL = "https://api.mistral.ai/v1"
+EMB_API_KEY = "YOUR_MISTRAL_KEY"
+EMB_MODEL = "mistral-embed"
+EMB_DIM = 1024

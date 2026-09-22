@@ -7,25 +7,17 @@ import re
 import json
 import numpy as np
 from tqdm import tqdm
-from openai import OpenAI
-from my_config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
+
+from hyperrag.llm import groq_mistral_complete_sync
 
 
-def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs) -> str:
-    openai_client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.extend(history_messages)
-    messages.append({"role": "user", "content": prompt})
-
-    response = openai_client.chat.completions.create(
-        model=LLM_MODEL, messages=messages, **kwargs
+def llm_model_func(prompt, system_prompt=None, history_messages=None, **kwargs) -> str:
+    return groq_mistral_complete_sync(
+        prompt,
+        system_prompt=system_prompt,
+        history_messages=history_messages or [],
+        **kwargs,
     )
-    if not response.choices or response.choices[0].message is None:
-        raise ValueError("LLM returned empty or filtered response")
-    return response.choices[0].message.content
 
 
 def extract_queries_and_answers(file_path):
@@ -46,12 +38,10 @@ def extarct_queries_and_refs(file_path: Path):
 
 
 def exam_by_scoring(queries, answers, refs):
-
     responses = []
     sys_prompt = """
         ---Role---
         You are an expert tasked with evaluating answers to the questions by using the relevant documents based on five criteria:**Comprehensiveness**, **Diversity**,**Empowerment**, **Logical**,and **Readability** .
-
         """
     for query, answer, reference in tqdm(
         zip(queries, answers, refs), desc="Evaluating answers", total=len(queries)
@@ -104,10 +94,8 @@ def exam_by_scoring(queries, answers, refs):
             Level 4 | 60-80  | The format of the answer is clear, the writing is well organized and the reading is smooth.
             Level 5 | 80-100 | The format of the answer is very clear, the writing structure is great, the reading experience is excellent, the format is standardized and easy to understand.
 
-           For each indicator, please give the problem a corresponding Level based on the description of the indicator, and then give a score according to the score range of the level.
+            For each indicator, please give the problem a corresponding Level based on the description of the indicator, and then give a score according to the score range of the level.
 
-       
-            
             Here are the relevant documents:
                 {reference}
 
@@ -116,7 +104,6 @@ def exam_by_scoring(queries, answers, refs):
 
             Here are the answers:
                 {answer}
-
 
             Evaluate all the answers using the six criteria listed above, for each criterion, provide a summary description, give a Level based on the description of the indicator, and then give a score based on the score range of the level.
 
@@ -148,9 +135,7 @@ def exam_by_scoring(queries, answers, refs):
                     "Level": "A level range 1 to 5"  # This should be a single number, not a range
                     "Score": "A value range 0 to 100"  # This should be a single number, not a range
                 }}
-                
             }}
-
         """
         response = llm_model_func(prompt, sys_prompt)
         responses.append(response)

@@ -8,22 +8,24 @@ import numpy as np
 
 from hyperrag import HyperRAG
 from hyperrag.utils import EmbeddingFunc
-from hyperrag.llm import openai_embedding, openai_complete_if_cache
+from hyperrag.llm import (
+    openai_embedding,
+    groq_mistral_complete_if_cache,
+)
 
-from my_config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 from my_config import EMB_API_KEY, EMB_BASE_URL, EMB_MODEL, EMB_DIM
 
 
 async def llm_model_func(
-    prompt, system_prompt=None, history_messages=[], **kwargs
+    prompt,
+    system_prompt=None,
+    history_messages=None,
+    **kwargs,
 ) -> str:
-    return await openai_complete_if_cache(
-        LLM_MODEL,
+    return await groq_mistral_complete_if_cache(
         prompt,
         system_prompt=system_prompt,
-        history_messages=history_messages,
-        api_key=LLM_API_KEY,
-        base_url=LLM_BASE_URL,
+        history_messages=history_messages or [],
         **kwargs,
     )
 

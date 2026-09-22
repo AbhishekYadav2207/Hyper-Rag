@@ -7,25 +7,17 @@ import re
 import json
 import numpy as np
 from tqdm import tqdm
-from openai import OpenAI
-from my_config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
+
+from hyperrag.llm import groq_mistral_complete_sync
 
 
-def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs) -> str:
-    openai_client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.extend(history_messages)
-    messages.append({"role": "user", "content": prompt})
-
-    response = openai_client.chat.completions.create(
-        model=LLM_MODEL, messages=messages, **kwargs
+def llm_model_func(prompt, system_prompt=None, history_messages=None, **kwargs) -> str:
+    return groq_mistral_complete_sync(
+        prompt,
+        system_prompt=system_prompt,
+        history_messages=history_messages or [],
+        **kwargs,
     )
-    if not response.choices or response.choices[0].message is None:
-        raise ValueError("LLM returned empty or filtered response")
-    return response.choices[0].message.content
 
 
 def extract_queries_and_answers(file_path):
@@ -38,7 +30,6 @@ def extract_queries_and_answers(file_path):
 
 # Deal with one by one
 def exam_by_selection(queries, A_answers, B_answers):
-
     responses = []
     sys_prompt = """
         ---Role---
@@ -139,8 +130,6 @@ def fetch_selection_results(responses):
     ]
     total_scores = [0] * 8
     for i, response in enumerate(responses):
-        # response = response.replace('```json\\n', '').replace('```', '').strip()
-        # response = response.strip('"').replace('\\n', '\n').replace('\\"', '"')
         scores = re.findall(r'"Winner":\s*"([^"]+)"', response)
         for i in range(8):
             if scores[i].lower() == "answer 1":

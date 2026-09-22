@@ -5,32 +5,19 @@ import tiktoken
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-from openai import OpenAI
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from my_config import LLM_API_KEY, LLM_BASE_URL
-
-# suggest using more powerful LLMs to extract questions like gpt-4o
-LLM_MODEL = "gpt-4o"
-# LLM_MODEL = "gpt-4o-mini"
+from hyperrag.llm import groq_mistral_complete_sync
 
 
-def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs) -> str:
-    openai_client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
-
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.extend(history_messages)
-    messages.append({"role": "user", "content": prompt})
-
-    response = openai_client.chat.completions.create(
-        model=LLM_MODEL, messages=messages, **kwargs
+def llm_model_func(prompt, system_prompt=None, history_messages=None, **kwargs) -> str:
+    return groq_mistral_complete_sync(
+        prompt,
+        system_prompt=system_prompt,
+        history_messages=history_messages or [],
+        **kwargs,
     )
-    if not response.choices or response.choices[0].message is None:
-        raise ValueError("LLM returned empty or filtered response")
-    return response.choices[0].message.content
 
 
 question_prompt = {
@@ -110,7 +97,7 @@ encoding = tiktoken.encoding_for_model("gpt-4o")
 
 if __name__ == "__main__":
     data_name = "mix"
-    question_stage  = 2
+    question_stage = 2
     WORKING_DIR = Path("caches") / data_name
     # number of question stages to extract, which can be 1, 2, or 3
     len_big_chunks = 3

@@ -45,10 +45,10 @@ sys.path.append(str(ROOT))
 # =============================================================================
 from hyperrag import HyperRAG, QueryParam  # noqa: E402
 from hyperrag.utils import EmbeddingFunc  # noqa: E402
-from hyperrag.llm import openai_complete_stream_if_cache  # noqa: E402
+from hyperrag.llm import groq_mistral_stream_if_cache  # noqa: E402
 
 from reproduce.Step_3_response_question import llm_model_func, embedding_func  # noqa: E402
-from my_config import EMB_DIM, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL  # noqa: E402
+from my_config import EMB_DIM  # noqa: E402
 
 # =============================================================================
 # FastAPI
@@ -119,23 +119,20 @@ async def _startup() -> None:
     logger.info("WORKING_DIR=%s", WORKING_DIR)
     logger.info("MODE=%s", MODE)
 
-    async def llm_model_stream_func(prompt, system_prompt=None, history_messages=[], **kwargs):
-        # 这里用 hyperrag.llm 里的 openai_complete_stream_if_cache 做真 token streaming
-        async for tok in openai_complete_stream_if_cache(
-            model=LLM_MODEL,
+    async def llm_model_stream_func(prompt, system_prompt=None, history_messages=None, **kwargs):
+        # 使用 Groq -> Mistral 流式输出
+        async for tok in groq_mistral_stream_if_cache(
             prompt=prompt,
             system_prompt=system_prompt,
-            history_messages=history_messages,
-            api_key=LLM_API_KEY,
-            base_url=LLM_BASE_URL,
+            history_messages=history_messages or [],
             **kwargs,
         ):
             yield tok
 
     rag = HyperRAG(
         working_dir=WORKING_DIR,
-        llm_model_func=llm_model_func,                 # 非流式
-        llm_model_stream_func=llm_model_stream_func,   # 流式（关键）
+        llm_model_func=llm_model_func,                 # 非流式（Groq -> Mistral fallback）
+        llm_model_stream_func=llm_model_stream_func,   # 流式（Groq -> Mistral fallback）
         embedding_func=EmbeddingFunc(
             embedding_dim=EMB_DIM,
             max_token_size=8192,
@@ -204,7 +201,7 @@ async def query_stream(
     """
     真·HyperRAG 流式输出：
     - 调用 rag.astream_query(...)，由 hyperrag 内部检索/构图/约束后，再由 LLM streaming 输出 token
-    - 前端直接按文本流读取即可（你已经实现了 fetch reader）
+    - 前端直接按文本流读取即可
     """
     _require_api_key(x_api_key)
     ip = request.client.host if request.client else "unknown"

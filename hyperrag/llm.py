@@ -1,5 +1,6 @@
 import os
 import copy
+import logging
 from functools import lru_cache
 import json
 import aioboto3
@@ -7,6 +8,7 @@ import aiohttp
 import numpy as np
 
 from openai import (
+    OpenAI,
     AsyncOpenAI,
     APIConnectionError,
     RateLimitError,
@@ -23,10 +25,26 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
+
+from my_config import (
+    GROQ_BASE_URL,
+    GROQ_API_KEY,
+    GROQ_MODEL,
+    MISTRAL_BASE_URL,
+    MISTRAL_API_KEY,
+    MISTRAL_MODEL,
+    EMB_BASE_URL,
+    EMB_API_KEY,
+    EMB_MODEL,
+    EMB_DIM,
+)
+
 from pydantic import BaseModel, Field
 from typing import List, Dict, Callable, Any
 from .base import BaseKVStorage
 from .utils import compute_args_hash, wrap_embedding_func_with_attrs
+
+logger = logging.getLogger("hyperrag.llm")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -40,23 +58,27 @@ async def openai_complete_if_cache(
     model,
     prompt,
     system_prompt=None,
-    history_messages=[],
+    history_messages=None,
     base_url=None,
     api_key=None,
     **kwargs,
 ) -> str:
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
+    client_kwargs = {}
+    if api_key is not None:
+        client_kwargs["api_key"] = api_key
+    if base_url is not None:
+        client_kwargs["base_url"] = base_url
 
-    openai_async_client = (
-        AsyncOpenAI() if base_url is None else AsyncOpenAI(base_url=base_url)
-    )
+    openai_async_client = AsyncOpenAI(**client_kwargs)
+
     hashing_kv: BaseKVStorage = kwargs.pop("hashing_kv", None)
     messages = []
     if system_prompt is not None:
         messages.append({"role": "system", "content": system_prompt})
-    messages.extend(history_messages)
+    if history_messages:
+        messages.extend(history_messages)
     messages.append({"role": "user", "content": prompt})
+
     if hashing_kv is not None:
         args_hash = compute_args_hash(model, messages)
         if_cache_return = await hashing_kv.get_by_id(args_hash)
@@ -73,48 +95,97 @@ async def openai_complete_if_cache(
         )
     return response.choices[0].message.content
 
+
+async def groq_mistral_complete_if_cache(
+    prompt,
+    system_prompt=None,
+    history_messages=None,
+    **kwargs,
+) -> str:
+    """
+    Primary LLM: Groq (GROQ_MODEL, GROQ_BASE_URL)
+    Fallback LLM: Mistral (MISTRAL_MODEL, MISTRAL_BASE_URL)
+    Preserves caching and retry logic via openai_complete_if_cache.
+    """
+    history = history_messages if history_messages is not None else []
+
+    # 1) Try Groq (Primary)
+    try:
+        return await openai_complete_if_cache(
+            model=GROQ_MODEL,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            history_messages=history,
+            api_key=GROQ_API_KEY,
+            base_url=GROQ_BASE_URL,
+            **kwargs.copy(),
+        )
+    except Exception as groq_error:
+        logger.warning(
+            f"Groq primary LLM failed ({type(groq_error).__name__}: {groq_error}). "
+            "Falling back to Mistral..."
+        )
+
+    # 2) Try Mistral (Fallback)
+    try:
+        return await openai_complete_if_cache(
+            model=MISTRAL_MODEL,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            history_messages=history,
+            api_key=MISTRAL_API_KEY,
+            base_url=MISTRAL_BASE_URL,
+            **kwargs.copy(),
+        )
+    except Exception as mistral_error:
+        raise RuntimeError(
+            f"Both Groq primary LLM and Mistral fallback LLM failed. Mistral error: {mistral_error}"
+        ) from mistral_error
+
+
 async def openai_complete_stream_if_cache(
     model,
     prompt,
     system_prompt=None,
-    history_messages=[],
+    history_messages=None,
     base_url=None,
     api_key=None,
     chunk_size: int = 32,
     **kwargs,
 ):
     """
-    OpenAI-compatible 流式输出（async generator）
-    - 命中缓存：按 chunk_size 分块 yield
-    - 不命中：stream=True 逐 token yield，并在结束后写缓存
+    OpenAI-compatible streaming output (async generator)
+    - Cache hit: yields in chunk_size blocks
+    - Cache miss: streams token-by-token and writes cache upon completion
     """
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
+    client_kwargs = {}
+    if api_key is not None:
+        client_kwargs["api_key"] = api_key
+    if base_url is not None:
+        client_kwargs["base_url"] = base_url
 
-    openai_async_client = (
-        AsyncOpenAI() if base_url is None else AsyncOpenAI(base_url=base_url)
-    )
+    openai_async_client = AsyncOpenAI(**client_kwargs)
 
     hashing_kv: BaseKVStorage = kwargs.pop("hashing_kv", None)
 
     messages = []
     if system_prompt is not None:
         messages.append({"role": "system", "content": system_prompt})
-    messages.extend(history_messages)
+    if history_messages:
+        messages.extend(history_messages)
     messages.append({"role": "user", "content": prompt})
 
-    # 1) cache 命中：直接回放
+    # 1) Cache hit: replay cached content
     if hashing_kv is not None:
         args_hash = compute_args_hash(model, messages)
         if_cache_return = await hashing_kv.get_by_id(args_hash)
         if if_cache_return is not None:
             cached = if_cache_return["return"] or ""
-            # 按块 yield，避免一次性返回
             for i in range(0, len(cached), chunk_size):
-                yield cached[i:i + chunk_size]
+                yield cached[i : i + chunk_size]
             return
 
-    # 2) cache 未命中：真实 stream
+    # 2) Cache miss: stream from provider
     full_text = []
     stream = await openai_async_client.chat.completions.create(
         model=model,
@@ -131,10 +202,128 @@ async def openai_complete_stream_if_cache(
             full_text.append(delta)
             yield delta
 
-    # 3) 写入 cache
+    # 3) Write to cache
     if hashing_kv is not None:
         text = "".join(full_text)
         await hashing_kv.upsert({args_hash: {"return": text, "model": model}})
+
+
+async def groq_mistral_stream_if_cache(
+    prompt,
+    system_prompt=None,
+    history_messages=None,
+    chunk_size: int = 32,
+    **kwargs,
+):
+    """
+    Streaming LLM routing: Groq first, Mistral fallback.
+    - If Groq fails BEFORE producing output, falls back to Mistral.
+    - If Groq has already emitted part of the response, does NOT append Mistral response.
+    - Preserves cache replay and chunked streaming behavior.
+    """
+    history = history_messages if history_messages is not None else []
+    yielded_any = False
+    groq_failed_before_yield = False
+
+    try:
+        async for tok in openai_complete_stream_if_cache(
+            model=GROQ_MODEL,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            history_messages=history,
+            api_key=GROQ_API_KEY,
+            base_url=GROQ_BASE_URL,
+            chunk_size=chunk_size,
+            **kwargs.copy(),
+        ):
+            yielded_any = True
+            yield tok
+    except Exception as e:
+        if not yielded_any:
+            groq_failed_before_yield = True
+            logger.warning(
+                f"Groq streaming LLM failed before emitting output ({type(e).__name__}: {e}). "
+                "Falling back to Mistral..."
+            )
+        else:
+            logger.error(
+                f"Groq streaming failed after emitting output ({type(e).__name__}: {e}). "
+                "Aborting stream to prevent duplicate response."
+            )
+            raise
+
+    if groq_failed_before_yield:
+        try:
+            async for tok in openai_complete_stream_if_cache(
+                model=MISTRAL_MODEL,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                history_messages=history,
+                api_key=MISTRAL_API_KEY,
+                base_url=MISTRAL_BASE_URL,
+                chunk_size=chunk_size,
+                **kwargs.copy(),
+            ):
+                yield tok
+        except Exception as mistral_err:
+            raise RuntimeError(
+                f"Both Groq and Mistral streaming failed. Mistral error: {mistral_err}"
+            ) from mistral_err
+
+
+def groq_mistral_complete_sync(
+    prompt,
+    system_prompt=None,
+    history_messages=None,
+    **kwargs,
+) -> str:
+    """
+    Synchronous LLM routing: Groq first, Mistral fallback.
+    """
+    messages = []
+    if system_prompt is not None:
+        messages.append({"role": "system", "content": system_prompt})
+    if history_messages:
+        messages.extend(history_messages)
+    messages.append({"role": "user", "content": prompt})
+
+    try:
+        client = OpenAI(
+            api_key=GROQ_API_KEY,
+            base_url=GROQ_BASE_URL,
+        )
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=messages,
+            **kwargs,
+        )
+        if not response.choices or response.choices[0].message is None:
+            raise ValueError("Groq returned empty response")
+        return response.choices[0].message.content
+    except Exception as groq_error:
+        logger.warning(
+            f"Groq synchronous call failed ({type(groq_error).__name__}: {groq_error}). "
+            "Falling back to Mistral..."
+        )
+
+    try:
+        client = OpenAI(
+            api_key=MISTRAL_API_KEY,
+            base_url=MISTRAL_BASE_URL,
+        )
+        response = client.chat.completions.create(
+            model=MISTRAL_MODEL,
+            messages=messages,
+            **kwargs,
+        )
+        if not response.choices or response.choices[0].message is None:
+            raise ValueError("Mistral returned empty response")
+        return response.choices[0].message.content
+    except Exception as mistral_error:
+        raise RuntimeError(
+            f"Both Groq and Mistral synchronous calls failed. Mistral error: {mistral_error}"
+        ) from mistral_error
+
 
 @retry(
     stop=stop_after_attempt(3),
@@ -145,7 +334,7 @@ async def azure_openai_complete_if_cache(
     model,
     prompt,
     system_prompt=None,
-    history_messages=[],
+    history_messages=None,
     base_url=None,
     api_key=None,
     **kwargs,
@@ -165,7 +354,8 @@ async def azure_openai_complete_if_cache(
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
-    messages.extend(history_messages)
+    if history_messages:
+        messages.extend(history_messages)
     if prompt is not None:
         messages.append({"role": "user", "content": prompt})
     if hashing_kv is not None:
@@ -198,7 +388,7 @@ async def bedrock_complete_if_cache(
     model,
     prompt,
     system_prompt=None,
-    history_messages=[],
+    history_messages=None,
     aws_access_key_id=None,
     aws_secret_access_key=None,
     aws_session_token=None,
@@ -214,24 +404,20 @@ async def bedrock_complete_if_cache(
         "AWS_SESSION_TOKEN", aws_session_token
     )
 
-    # Fix message history format
+    history = history_messages if history_messages is not None else []
     messages = []
-    for history_message in history_messages:
+    for history_message in history:
         message = copy.copy(history_message)
         message["content"] = [{"text": message["content"]}]
         messages.append(message)
 
-    # Add user prompt
     messages.append({"role": "user", "content": [{"text": prompt}]})
 
-    # Initialize Converse API arguments
     args = {"modelId": model, "messages": messages}
 
-    # Define system prompt
     if system_prompt:
         args["system"] = [{"text": system_prompt}]
 
-    # Map and set up inference parameters
     inference_params_map = {
         "max_tokens": "maxTokens",
         "top_p": "topP",
@@ -253,7 +439,6 @@ async def bedrock_complete_if_cache(
         if if_cache_return is not None:
             return if_cache_return["return"]
 
-    # Call model via Converse API
     session = aioboto3.Session()
     async with session.client("bedrock-runtime") as bedrock_async_client:
         try:
@@ -275,24 +460,22 @@ async def bedrock_complete_if_cache(
 
 
 async def gpt_4o_complete(
-    prompt, system_prompt=None, history_messages=[], **kwargs
+    prompt, system_prompt=None, history_messages=None, **kwargs
 ) -> str:
-
-    return await openai_complete_if_cache(
-        "gpt-4o",
+    """Retained for backwards compatibility: routes to groq_mistral_complete_if_cache"""
+    return await groq_mistral_complete_if_cache(
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages,
-
         **kwargs,
     )
 
 
 async def gpt_4o_mini_complete(
-    prompt, system_prompt=None, history_messages=[], **kwargs
+    prompt, system_prompt=None, history_messages=None, **kwargs
 ) -> str:
-    return await openai_complete_if_cache(
-        "gpt-4o-mini",
+    """Retained for backwards compatibility: routes to groq_mistral_complete_if_cache"""
+    return await groq_mistral_complete_if_cache(
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages,
@@ -301,7 +484,7 @@ async def gpt_4o_mini_complete(
 
 
 async def azure_openai_complete(
-    prompt, system_prompt=None, history_messages=[], **kwargs
+    prompt, system_prompt=None, history_messages=None, **kwargs
 ) -> str:
     return await azure_openai_complete_if_cache(
         "conversation-4o-mini",
@@ -313,7 +496,7 @@ async def azure_openai_complete(
 
 
 async def bedrock_complete(
-    prompt, system_prompt=None, history_messages=[], **kwargs
+    prompt, system_prompt=None, history_messages=None, **kwargs
 ) -> str:
     return await bedrock_complete_if_cache(
         "anthropic.claude-3-haiku-20240307-v1:0",
@@ -324,28 +507,46 @@ async def bedrock_complete(
     )
 
 
-@wrap_embedding_func_with_attrs(embedding_dim=1536, max_token_size=8192)
+@wrap_embedding_func_with_attrs(
+    embedding_dim=1024,
+    max_token_size=8192,
+)
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=60),
-    retry=retry_if_exception_type((RateLimitError, APIConnectionError, Timeout)),
+    retry=retry_if_exception_type(
+        (RateLimitError, APIConnectionError, Timeout)
+    ),
 )
 async def openai_embedding(
     texts: list[str],
-    model: str = "text-embedding-3-small",
+    model: str = None,
     base_url: str = None,
     api_key: str = None,
 ) -> np.ndarray:
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
+    """
+    OpenAI-compatible embedding function using Mistral mistral-embed (1024 dimensions).
+    Function name preserved for compatibility.
+    """
+    resolved_model = model or EMB_MODEL or "mistral-embed"
+    resolved_base_url = base_url or EMB_BASE_URL or "https://api.mistral.ai/v1"
+    resolved_api_key = api_key or EMB_API_KEY or MISTRAL_API_KEY
 
-    openai_async_client = (
-        AsyncOpenAI() if base_url is None else AsyncOpenAI(base_url=base_url)
+    client = AsyncOpenAI(
+        api_key=resolved_api_key,
+        base_url=resolved_base_url,
     )
-    response = await openai_async_client.embeddings.create(
-        model=model, input=texts, encoding_format="float"
+
+    response = await client.embeddings.create(
+        model=resolved_model,
+        input=texts,
+        encoding_format="float",
     )
-    return np.array([dp.embedding for dp in response.data])
+
+    return np.array(
+        [item.embedding for item in response.data],
+        dtype=np.float32,
+    )
 
 
 @wrap_embedding_func_with_attrs(embedding_dim=1536, max_token_size=8192)
@@ -415,12 +616,6 @@ async def siliconcloud_embedding(
     return np.array(embeddings)
 
 
-# @wrap_embedding_func_with_attrs(embedding_dim=1024, max_token_size=8192)
-# @retry(
-#     stop=stop_after_attempt(3),
-#     wait=wait_exponential(multiplier=1, min=4, max=10),
-#     retry=retry_if_exception_type((RateLimitError, APIConnectionError, Timeout)),  # TODO: fix exceptions
-# )
 async def bedrock_embedding(
     texts: list[str],
     model: str = "amazon.titan-embed-text-v2:0",
@@ -447,7 +642,6 @@ async def bedrock_embedding(
                     body = json.dumps(
                         {
                             "inputText": text,
-                            # 'dimensions': embedding_dim,
                             "embeddingTypes": ["float"],
                         }
                     )
@@ -488,22 +682,6 @@ async def bedrock_embedding(
 
 
 class Model(BaseModel):
-    """
-    This is a Pydantic model class named 'Model' that is used to define a custom language model.
-
-    Attributes:
-        gen_func (Callable[[Any], str]): A callable function that generates the response from the language model.
-            The function should take any argument and return a string.
-        kwargs (Dict[str, Any]): A dictionary that contains the arguments to pass to the callable function.
-            This could include parameters such as the model name, API key, etc.
-
-    Example usage:
-        Model(gen_func=openai_complete_if_cache, kwargs={"model": "gpt-4", "api_key": os.environ["OPENAI_API_KEY_1"]})
-
-    In this example, 'openai_complete_if_cache' is the callable function that generates the response from the OpenAI model.
-    The 'kwargs' dictionary contains the model name and API key to be passed to the function.
-    """
-
     gen_func: Callable[[Any], str] = Field(
         ...,
         description="A function that generates the response from the llm. The response must be a string",
@@ -518,30 +696,6 @@ class Model(BaseModel):
 
 
 class MultiModel:
-    """
-    Distributes the load across multiple language models. Useful for circumventing low rate limits with certain api providers especially if you are on the free tier.
-    Could also be used for spliting across diffrent models or providers.
-
-    Attributes:
-        models (List[Model]): A list of language models to be used.
-
-    Usage example:
-        ```python
-        models = [
-            Model(gen_func=openai_complete_if_cache, kwargs={"model": "gpt-4", "api_key": os.environ["OPENAI_API_KEY_1"]}),
-            Model(gen_func=openai_complete_if_cache, kwargs={"model": "gpt-4", "api_key": os.environ["OPENAI_API_KEY_2"]}),
-            Model(gen_func=openai_complete_if_cache, kwargs={"model": "gpt-4", "api_key": os.environ["OPENAI_API_KEY_3"]}),
-            Model(gen_func=openai_complete_if_cache, kwargs={"model": "gpt-4", "api_key": os.environ["OPENAI_API_KEY_4"]}),
-            Model(gen_func=openai_complete_if_cache, kwargs={"model": "gpt-4", "api_key": os.environ["OPENAI_API_KEY_5"]}),
-        ]
-        multi_model = MultiModel(models)
-        rag = LightRAG(
-            llm_model_func=multi_model.llm_model_func
-            / ..other args
-            )
-        ```
-    """
-
     def __init__(self, models: List[Model]):
         self._models = models
         self._current_model = 0
@@ -551,14 +705,14 @@ class MultiModel:
         return self._models[self._current_model]
 
     async def llm_model_func(
-        self, prompt, system_prompt=None, history_messages=[], **kwargs
+        self, prompt, system_prompt=None, history_messages=None, **kwargs
     ) -> str:
-        kwargs.pop("model", None)  # stop from overwriting the custom model name
+        kwargs.pop("model", None)
         next_model = self._next_model()
         args = dict(
             prompt=prompt,
             system_prompt=system_prompt,
-            history_messages=history_messages,
+            history_messages=history_messages or [],
             **kwargs,
             **next_model.kwargs,
         )
