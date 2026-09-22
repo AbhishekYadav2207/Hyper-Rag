@@ -1,6 +1,9 @@
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import time
@@ -53,6 +56,8 @@ if __name__ == "__main__":
     rag = HyperRAG(
         working_dir=WORKING_DIR,
         llm_model_func=llm_model_func,
+        llm_model_max_async=1,
+        llm_model_kwargs={"max_tokens": 1500},
         embedding_func=EmbeddingFunc(
             embedding_dim=EMB_DIM, max_token_size=8192, func=embedding_func
         ),

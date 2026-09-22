@@ -446,7 +446,7 @@ async def extract_entities(
         hint_prompt = entity_extract_prompt.format(**context_base, input_text=content)
 
         final_result = await use_llm_func(hint_prompt)
-        if final_result is None:
+        if final_result is None or not final_result.strip():
             return None,None,None,None
 
         history = pack_user_ass_to_openai_messages(hint_prompt, final_result)
@@ -532,10 +532,13 @@ async def extract_entities(
         # 进度条
         percent = (already_processed / len(ordered_chunks)) * 100
         bar_length = int(50 * already_processed // len(ordered_chunks))
-        bar = '█' * bar_length + '-' * (50 - bar_length)
-        sys.stdout.write(
-            f'\n\r|{bar}| {percent:.2f}% |{hours:02}:{minutes:02}:{seconds:02}| {now_ticks} Processed, {already_entities} entities, {already_relations} relations, {already_relations_low} relations_low, {already_relations_high} relations_high \n')
-        sys.stdout.flush()
+        bar = '=' * bar_length + '-' * (50 - bar_length)
+        try:
+            sys.stdout.write(
+                f'\n\r|{bar}| {percent:.2f}% |{hours:02}:{minutes:02}:{seconds:02}| Processed, {already_entities} entities, {already_relations} relations\n')
+            sys.stdout.flush()
+        except Exception:
+            pass
         return dict(maybe_nodes), dict(maybe_edges), dict(maybe_edges_low), dict(maybe_edges_high)
 
     # ----------------------------------------------------------------------------

@@ -52,7 +52,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type((RateLimitError, APIConnectionError, Timeout)),
+    retry=retry_if_exception_type((APIConnectionError, Timeout)),
 )
 async def openai_complete_if_cache(
     model,
@@ -63,7 +63,7 @@ async def openai_complete_if_cache(
     api_key=None,
     **kwargs,
 ) -> str:
-    client_kwargs = {}
+    client_kwargs = {"max_retries": 0}
     if api_key is not None:
         client_kwargs["api_key"] = api_key
     if base_url is not None:
@@ -121,10 +121,9 @@ async def groq_mistral_complete_if_cache(
             **kwargs.copy(),
         )
     except Exception as groq_error:
-        logger.warning(
-            f"Groq primary LLM failed ({type(groq_error).__name__}: {groq_error}). "
-            "Falling back to Mistral..."
-        )
+        msg = f"[Groq failed] {type(groq_error).__name__}: {groq_error}\n[Fallback] Switching to Mistral..."
+        logger.warning(msg)
+        print(msg, flush=True)
 
     # 2) Try Mistral (Fallback)
     try:
@@ -158,7 +157,7 @@ async def openai_complete_stream_if_cache(
     - Cache hit: yields in chunk_size blocks
     - Cache miss: streams token-by-token and writes cache upon completion
     """
-    client_kwargs = {}
+    client_kwargs = {"max_retries": 0}
     if api_key is not None:
         client_kwargs["api_key"] = api_key
     if base_url is not None:
@@ -241,14 +240,17 @@ async def groq_mistral_stream_if_cache(
     except Exception as e:
         if not yielded_any:
             groq_failed_before_yield = True
-            logger.warning(
-                f"Groq streaming LLM failed before emitting output ({type(e).__name__}: {e}). "
-                "Falling back to Mistral..."
-            )
+            msg = f"[Groq failed] {type(e).__name__}: {e}\n[Fallback] Switching to Mistral..."
+            logger.warning(msg)
+            print(msg, flush=True)
         else:
             logger.error(
                 f"Groq streaming failed after emitting output ({type(e).__name__}: {e}). "
                 "Aborting stream to prevent duplicate response."
+            )
+            print(
+                f"[Groq streaming failed after emitting output] {type(e).__name__}: {e}",
+                flush=True,
             )
             raise
 
@@ -291,6 +293,7 @@ def groq_mistral_complete_sync(
         client = OpenAI(
             api_key=GROQ_API_KEY,
             base_url=GROQ_BASE_URL,
+            max_retries=0,
         )
         response = client.chat.completions.create(
             model=GROQ_MODEL,
@@ -301,15 +304,15 @@ def groq_mistral_complete_sync(
             raise ValueError("Groq returned empty response")
         return response.choices[0].message.content
     except Exception as groq_error:
-        logger.warning(
-            f"Groq synchronous call failed ({type(groq_error).__name__}: {groq_error}). "
-            "Falling back to Mistral..."
-        )
+        msg = f"[Groq failed] {type(groq_error).__name__}: {groq_error}\n[Fallback] Switching to Mistral..."
+        logger.warning(msg)
+        print(msg, flush=True)
 
     try:
         client = OpenAI(
             api_key=MISTRAL_API_KEY,
             base_url=MISTRAL_BASE_URL,
+            max_retries=0,
         )
         response = client.chat.completions.create(
             model=MISTRAL_MODEL,

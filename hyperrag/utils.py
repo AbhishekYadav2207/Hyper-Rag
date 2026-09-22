@@ -159,7 +159,8 @@ def decode_tokens_by_tiktoken(tokens: list[int], model_name: str = "gpt-4o"):
 def pack_user_ass_to_openai_messages(*args: str):
     roles = ["user", "assistant"]
     return [
-        {"role": roles[i % 2], "content": content} for i, content in enumerate(args) #if content is not None
+        {"role": roles[i % 2], "content": content if content and content.strip() else "None"}
+        for i, content in enumerate(args)
     ]
 
 
