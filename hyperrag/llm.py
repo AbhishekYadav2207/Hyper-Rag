@@ -89,11 +89,22 @@ async def openai_complete_if_cache(
         model=model, messages=messages, **kwargs
     )
 
+    if not getattr(response, "choices", None):
+        raise RuntimeError(
+            f"Provider returned no choices (model={getattr(response, 'model', model)})."
+        )
+
+    content = response.choices[0].message.content
+    if content is None:
+        raise RuntimeError(
+            f"Provider response has content=None (model={getattr(response, 'model', model)})."
+        )
+
     if hashing_kv is not None:
         await hashing_kv.upsert(
-            {args_hash: {"return": response.choices[0].message.content, "model": model}}
+            {args_hash: {"return": content, "model": model}}
         )
-    return response.choices[0].message.content
+    return content
 
 
 async def openrouter_mistral_complete_if_cache(
@@ -141,6 +152,127 @@ async def openrouter_mistral_complete_if_cache(
             f"Both OpenRouter primary LLM and Mistral fallback LLM failed. Mistral error: {mistral_error}"
         ) from mistral_error
 
+
+async def openrouter_nvidia_complete_if_cache(
+    prompt,
+    system_prompt=None,
+    history_messages=None,
+    **kwargs,
+) -> str:
+    """
+    NVIDIA Nemotron 3 Ultra through OpenRouter.
+    No Mistral fallback.
+    Inspects response safely, captures provider/model metadata,
+    supports caching and handles empty/error choices gracefully.
+    """
+    api_key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY")
+    base_url = OPENROUTER_BASE_URL or os.getenv(
+        "OPENROUTER_BASE_URL",
+        "https://openrouter.ai/api/v1",
+    )
+    model = OPENROUTER_MODEL or os.getenv(
+        "OPENROUTER_MODEL",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+    )
+
+    hashing_kv: BaseKVStorage = kwargs.pop("hashing_kv", None)
+    max_tokens = kwargs.pop("max_tokens", 2000)
+
+    messages = []
+    if system_prompt:
+        messages.append(
+            {
+                "role": "system",
+                "content": system_prompt,
+            }
+        )
+
+    if history_messages:
+        messages.extend(history_messages)
+
+    messages.append(
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    )
+
+    if hashing_kv is not None:
+        args_hash = compute_args_hash(model, messages)
+        if_cache_return = await hashing_kv.get_by_id(args_hash)
+        if if_cache_return is not None:
+            return if_cache_return["return"]
+
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        max_retries=0,
+    )
+
+    try:
+        raw_response = await client.chat.completions.with_raw_response.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+    except Exception as e:
+        msg = f"[NVIDIA ERROR] OpenRouter request failed: {type(e).__name__}: {e}"
+        logger.error(msg)
+        raise RuntimeError(msg) from e
+
+    status_code = raw_response.status_code
+    if status_code != 200:
+        msg = f"[NVIDIA ERROR] OpenRouter returned HTTP {status_code}: {raw_response.text}"
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    # Safely parse JSON to check for top-level error object or provider metadata
+    try:
+        raw_data = json.loads(raw_response.text)
+    except Exception:
+        raw_data = {}
+
+    if "error" in raw_data and raw_data["error"]:
+        err_info = raw_data["error"]
+        msg = f"[NVIDIA ERROR] OpenRouter returned error payload: {err_info}"
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    parsed = raw_response.parse()
+    choices = getattr(parsed, "choices", None)
+    if not choices:
+        msg = f"[NVIDIA ERROR] OpenRouter NVIDIA returned no choices (model={getattr(parsed, 'model', model)})."
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    choice = choices[0]
+    message = getattr(choice, "message", None)
+    content = getattr(message, "content", None) if message else None
+
+    # If content is None, safely inspect reasoning or refusal fields
+    if content is None:
+        reasoning = getattr(message, "reasoning", None) if message else None
+        if reasoning:
+            content = reasoning
+        else:
+            finish_reason = getattr(choice, "finish_reason", "unknown")
+            msg = (
+                f"[NVIDIA ERROR] OpenRouter NVIDIA response contained no usable final content "
+                f"(model={getattr(parsed, 'model', model)}, finish_reason={finish_reason})."
+            )
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+    returned_model = getattr(parsed, "model", model)
+    logger.info(f"OpenRouter NVIDIA response received (model: {returned_model})")
+
+    if hashing_kv is not None:
+        await hashing_kv.upsert(
+            {args_hash: {"return": content, "model": returned_model}}
+        )
+
+    return content
 
 # Backwards compatibility alias
 groq_mistral_complete_if_cache = openrouter_mistral_complete_if_cache

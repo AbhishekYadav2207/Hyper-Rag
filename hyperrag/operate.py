@@ -422,7 +422,7 @@ async def extract_entities(
     example_str = example_prompt.format(**example_base)
 
     context_base = dict(
-        language=PROMPTS["DEFAULT_LANGUAGE"],
+        language="English",
         entity_types=",".join(PROMPTS["DEFAULT_ENTITY_TYPES"]),
         tuple_delimiter=PROMPTS["DEFAULT_TUPLE_DELIMITER"],
         record_delimiter=PROMPTS["DEFAULT_RECORD_DELIMITER"],
@@ -1137,12 +1137,14 @@ async def hyper_query(
         combine the information from the local_query and global_query,
         so that we can have the final retrieval information.
     """
-    context = combine_contexts(relation_context.get("context"), entity_context.get("context"))
+    rel_ctx = relation_context if relation_context is not None else {}
+    ent_ctx = entity_context if entity_context is not None else {}
+    context = combine_contexts(rel_ctx.get("context"), ent_ctx.get("context"))
 
     contextJson = {
-        "entities": deduplicate_by_key(entity_context.get("entities", []) + relation_context.get("entities", []), "entity_name"),
-        "hyperedges": deduplicate_by_key(entity_context.get("hyperedges", []) + relation_context.get("hyperedges", []), "entity_set"),
-        "text_units": deduplicate_by_key(entity_context.get("text_units", []) + relation_context.get("text_units", []), "content")
+        "entities": deduplicate_by_key(ent_ctx.get("entities", []) + rel_ctx.get("entities", []), "entity_name"),
+        "hyperedges": deduplicate_by_key(ent_ctx.get("hyperedges", []) + rel_ctx.get("hyperedges", []), "entity_set"),
+        "text_units": deduplicate_by_key(ent_ctx.get("text_units", []) + rel_ctx.get("text_units", []), "content")
     }
 
     if query_param.only_need_context:

@@ -183,3 +183,9 @@ web-ui/backend/settings.json
 web-ui/backend/hyperrag_cache/
 web-ui/backend/uploads/
 web-ui/backend/files.db
+
+# Local test scripts
+/test_*.py
+reproduce/Step_nvidia_test.py
+reproduce/Step_extraction_debug.py
+reproduce/Step_reasoning_test.py

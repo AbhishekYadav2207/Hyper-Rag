@@ -2,7 +2,7 @@ GRAPH_FIELD_SEP = "<SEP>"
 
 PROMPTS = {}
 
-PROMPTS["DEFAULT_LANGUAGE"] = 'Chinese'
+PROMPTS["DEFAULT_LANGUAGE"] = 'English'
 PROMPTS["DEFAULT_TUPLE_DELIMITER"] = " | "
 PROMPTS["DEFAULT_RECORD_DELIMITER"] = "\n"
 PROMPTS["DEFAULT_COMPLETION_DELIMITER"] = "<|COMPLETE|>"
@@ -13,6 +13,17 @@ PROMPTS["DEFAULT_ENTITY_TYPES"] = ["organization", "person", "geo", "event", "ro
 PROMPTS["entity_extraction"] = """-Goal-
 Given a text document related to some knowledge or story and a list of entity types, identify all entities of these types from the text. Then construct hyperedges by extracting complex relationships among the identified entities.
 Use {language} as output language.
+
+IMPORTANT LANGUAGE REQUIREMENT:
+All output must be written in English.
+Do not output Chinese.
+Do not output translations in Chinese.
+Write ALL entity names, entity types, descriptions, relationship descriptions, keywords, and hyperedge descriptions in English.
+
+IMPORTANT FORMAT REQUIREMENT:
+Follow the exact extraction format expected by Hyper-RAG.
+Do not add explanations before the extraction.
+Do not add explanations after the extraction.
 
 -Steps-
 
