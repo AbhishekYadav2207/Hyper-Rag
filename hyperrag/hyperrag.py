@@ -2,8 +2,7 @@ import os
 import asyncio
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from functools import partial
-from typing import Type, cast
+from typing import Type, cast, Optional, Any, Tuple, Dict
 
 from .operate import (
     chunking_by_token_size,
@@ -44,6 +43,8 @@ from .base import (
 )
 
 from .operate import hyper_query_stream, hyper_query_lite_stream, naive_query_stream, llm_query_stream
+from .adaptive_router import AdaptiveRouter, AdaptiveDecision
+from my_config import ADAPTIVE_RAG_ENABLED
 
 
 def always_get_an_event_loop() -> asyncio.AbstractEventLoop:
@@ -105,10 +106,17 @@ class HyperRAG:
     addon_params: dict = field(default_factory=dict)
     convert_response_to_json_func: callable = convert_response_to_json
 
+    # adaptive routing
+    adaptive_router: Optional[Any] = None
+
     def __post_init__(self):
         log_file = os.path.join(self.working_dir, "HyperRAG.log")
         set_logger(log_file)
         logger.setLevel(self.log_level)
+
+        if self.adaptive_router is None:
+            self.adaptive_router = AdaptiveRouter()
+        self.last_adaptive_decision: Optional[AdaptiveDecision] = None
 
         logger.info(f"Logger initialized for working directory: {self.working_dir}")
 
@@ -265,13 +273,50 @@ class HyperRAG:
             tasks.append(cast(StorageNameSpace, storage_inst).index_done_callback())
         await asyncio.gather(*tasks)
 
+    def _resolve_query_mode(
+        self, query: str, param: QueryParam
+    ) -> Tuple[str, Optional[AdaptiveDecision]]:
+        """
+        Resolve the effective execution mode (hyper, hyper-lite, graph, naive, llm)
+        handling direct aliases ('core', 'lite') and 'adaptive' routing.
+        Preserves direct mode execution while enabling adaptive selection.
+        """
+        raw_mode = (param.mode or "adaptive").lower().strip()
+
+        # Direct explicit mode mappings
+        if raw_mode in ("hyper", "core"):
+            return "hyper", None
+        elif raw_mode in ("hyper-lite", "lite"):
+            return "hyper-lite", None
+        elif raw_mode == "hyper-query":
+            return "hyper", None
+        elif raw_mode in ("graph", "naive", "llm"):
+            return raw_mode, None
+        elif raw_mode == "adaptive":
+            if not ADAPTIVE_RAG_ENABLED:
+                logger.info("[Adaptive RAG] Disabled in config, falling back to core (hyper) mode")
+                return "hyper", None
+
+            if self.adaptive_router is None:
+                self.adaptive_router = AdaptiveRouter()
+
+            decision = self.adaptive_router.route(query)
+            effective_mode = "hyper" if decision.mode == "core" else "hyper-lite"
+            return effective_mode, decision
+        else:
+            raise ValueError(f"Unknown mode {param.mode}")
+
     def query(self, query: str, param: QueryParam = QueryParam()):
         loop = always_get_an_event_loop()
         return loop.run_until_complete(self.aquery(query, param))
 
     async def aquery(self, query: str, param: QueryParam = QueryParam()):
-        
-        if param.mode == "hyper":
+        effective_mode, decision = self._resolve_query_mode(query, param)
+        self.last_adaptive_decision = decision
+        if decision is not None:
+            param.adaptive_decision = decision
+
+        if effective_mode == "hyper":
             response = await hyper_query(
                 query,
                 self.chunk_entity_relation_hypergraph,
@@ -281,7 +326,7 @@ class HyperRAG:
                 param,
                 asdict(self),
             )
-        elif param.mode == "hyper-lite":
+        elif effective_mode == "hyper-lite":
             response = await hyper_query_lite(
                 query,
                 self.chunk_entity_relation_hypergraph,
@@ -290,7 +335,7 @@ class HyperRAG:
                 param,
                 asdict(self),
             )
-        elif param.mode == "graph":
+        elif effective_mode == "graph":
             response = await graph_query(
                 query,
                 self.chunk_entity_relation_hypergraph,
@@ -300,7 +345,7 @@ class HyperRAG:
                 param,
                 asdict(self),
             )
-        elif param.mode == "naive":
+        elif effective_mode == "naive":
             response = await naive_query(
                 query,
                 self.chunks_vdb,
@@ -308,7 +353,7 @@ class HyperRAG:
                 param,
                 asdict(self),
             )
-        elif param.mode == "llm":
+        elif effective_mode == "llm":
             response = await llm_query(
                 query,
                 param,
@@ -316,7 +361,12 @@ class HyperRAG:
             )
         else:
             raise ValueError(f"Unknown mode {param.mode}")
+
         await self._query_done()
+
+        if param.return_type == "json" and isinstance(response, dict) and decision is not None:
+            response["adaptive_decision"] = decision.to_dict()
+
         return response
 
     async def astream_query(self, query: str, param: QueryParam = QueryParam()):
@@ -327,11 +377,16 @@ class HyperRAG:
         if self.llm_model_stream_func is None:
             raise AttributeError("llm_model_stream_func is not set, streaming is unavailable.")
 
+        effective_mode, decision = self._resolve_query_mode(query, param)
+        self.last_adaptive_decision = decision
+        if decision is not None:
+            param.adaptive_decision = decision
+
         # 把 stream func 放进 global_config
         cfg = asdict(self)
         cfg["llm_model_stream_func"] = self.llm_model_stream_func
 
-        if param.mode == "hyper":
+        if effective_mode == "hyper":
             async for tok in hyper_query_stream(
                     query,
                     self.chunk_entity_relation_hypergraph,
@@ -343,7 +398,7 @@ class HyperRAG:
             ):
                 yield tok
 
-        elif param.mode == "hyper-lite":
+        elif effective_mode == "hyper-lite":
             async for tok in hyper_query_lite_stream(
                     query,
                     self.chunk_entity_relation_hypergraph,
@@ -354,7 +409,7 @@ class HyperRAG:
             ):
                 yield tok
 
-        elif param.mode == "naive":
+        elif effective_mode == "naive":
             async for tok in naive_query_stream(
                     query,
                     self.chunks_vdb,
@@ -364,7 +419,7 @@ class HyperRAG:
             ):
                 yield tok
 
-        elif param.mode == "llm":
+        elif effective_mode == "llm":
             async for tok in llm_query_stream(query, param, cfg):
                 yield tok
 

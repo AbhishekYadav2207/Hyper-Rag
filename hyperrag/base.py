@@ -13,7 +13,9 @@ T = TypeVar("T")
 
 @dataclass
 class QueryParam:
-    mode: Literal["hyper", "hyper-lite", "graph", "naive", "llm"] = "hyper-query"
+    mode: Literal[
+        "adaptive", "hyper", "core", "hyper-lite", "lite", "graph", "naive", "llm", "hyper-query"
+    ] = "adaptive"
     only_need_context: bool = False
     response_type: str = "Multiple Paragraphs"
     # Number of top-k items to retrieve; corresponds to entities in "local" mode and relationships in "global" mode.
@@ -26,6 +28,8 @@ class QueryParam:
     max_token_for_relation_context: int = 1600
     # return type
     return_type: Literal["json", "text"] = "text"
+    # Adaptive routing decision record (populated when mode is adaptive)
+    adaptive_decision: Optional[Any] = None
 
 
 @dataclass

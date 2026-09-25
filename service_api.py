@@ -70,13 +70,17 @@ query_param: Optional[QueryParam] = None
 # =============================================================================
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=6000)
-    mode: Optional[str] = Field(default=None, description="覆盖默认模式：hyper / hyper-lite / naive / llm")
+    mode: Optional[str] = Field(
+        default=None,
+        description="覆盖默认模式：adaptive / hyper / core / hyper-lite / lite / naive / llm",
+    )
 
 
 class QueryResponse(BaseModel):
     answer: str
     mode: str
     latency_ms: int
+    adaptive_decision: Optional[Dict[str, Any]] = None
 
 
 # =============================================================================
@@ -176,9 +180,13 @@ async def query(
     if rag is None:
         raise HTTPException(status_code=503, detail="服务尚未就绪，请稍后重试。")
 
-    mode = (req.mode or MODE).strip()
-    if mode not in {"hyper", "hyper-lite", "naive", "llm"}:
-        raise HTTPException(status_code=400, detail="mode 参数非法：hyper / hyper-lite / naive / llm")
+    mode = (req.mode or MODE).strip().lower()
+    valid_modes = {"adaptive", "hyper", "core", "hyper-lite", "lite", "naive", "llm"}
+    if mode not in valid_modes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"mode 参数非法：{', '.join(sorted(valid_modes))}",
+        )
 
     qp = QueryParam(mode=mode)
 
@@ -189,7 +197,17 @@ async def query(
         logger.exception("query 调用失败：%s", e)
         raise HTTPException(status_code=500, detail=str(e))
     latency_ms = int((time.time() - t0) * 1000)
-    return QueryResponse(answer=answer, mode=mode, latency_ms=latency_ms)
+    decision_dict = (
+        rag.last_adaptive_decision.to_dict()
+        if getattr(rag, "last_adaptive_decision", None)
+        else None
+    )
+    return QueryResponse(
+        answer=answer,
+        mode=mode,
+        latency_ms=latency_ms,
+        adaptive_decision=decision_dict,
+    )
 
 
 @app.post("/query_stream")
@@ -210,9 +228,13 @@ async def query_stream(
     if rag is None:
         raise HTTPException(status_code=503, detail="服务尚未就绪，请稍后重试。")
 
-    mode = (req.mode or MODE).strip()
-    if mode not in {"hyper", "hyper-lite", "naive", "llm"}:
-        raise HTTPException(status_code=400, detail="mode 参数非法：hyper / hyper-lite / naive / llm")
+    mode = (req.mode or MODE).strip().lower()
+    valid_modes = {"adaptive", "hyper", "core", "hyper-lite", "lite", "naive", "llm"}
+    if mode not in valid_modes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"mode 参数非法：{', '.join(sorted(valid_modes))}",
+        )
 
     qp = QueryParam(mode=mode)
 

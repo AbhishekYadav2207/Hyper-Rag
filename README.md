@@ -234,6 +234,107 @@ We conducted an efficiency analysis of our Hyper-RAG method using GPT-4o mini on
   <img src="./assets/speed_all.svg" alt="Efficiency analysis" width="60%" />
 </div>
 
+## 🔀 Adaptive Hyper-RAG (Routing Layer)
+
+### What Adaptive Hyper-RAG is
+Adaptive Hyper-RAG introduces a lightweight deterministic routing layer above the existing Hyper-Lite and Hyper-Core retrieval pipelines. Instead of manually specifying whether a query should use lightweight entity-focused retrieval or full high-order hyperedge reasoning, the router analyzes query characteristics and selects the mode dynamically.
+
+### Why it was added
+- **Query Diversity**: Simple single-entity factual queries often require only low-level entity context (Hyper-Lite), whereas multi-entity, comparative, or multi-hop queries benefit from high-order relationship hyperedges (Hyper-Core).
+- **Zero API Overhead**: The initial routing layer is strictly deterministic and heuristic-driven—it makes **no LLM calls** for routing, avoiding extra latency, API usage, or token costs.
+
+### What Features are Considered
+The router evaluates 12 interpretable signals across 8 feature categories:
+1. **Multi-Aspect Questions**: Conjunctions (`and`, `as well as`, `including`), clause enumerations, and comma-separated lists.
+2. **Comparison**: Explicit comparative indicators (`compare`, `versus`, `difference`, `between X and Y`).
+3. **Causal / Explanatory Reasoning**: Triggers requiring relational reasoning (`why`, `how does`, `causes`, `effect`, `mechanism`, `leads to`, `contribute to`).
+4. **Temporal Reasoning**: Chronological references (`over time`, `timeline`, `historically`, `evolution`, year ranges).
+5. **Multi-Hop Reasoning**: Connection pathways (`relationship between`, `how A affects B through C`, `associated with`).
+6. **Aggregation / Synthesis**: Synthesis demands (`summarize all`, `list all`, `across multiple sources`).
+7. **Entity Count**: Lightweight topic/entity extraction detecting quoted terms, proper nouns, and content noun chunks without heavyweight NER dependencies.
+8. **Requested Depth**: Explicit depth markers (`detailed`, `in-depth`, `exhaustive`, `step by step`).
+9. **Structural Complexity**: Word length, sentence count, and question marks.
+
+### How Complexity is Calculated & Thresholds Work
+Each detected feature contributes points to a transparent $0$ to $100$ score:
+- **Low Complexity ($0 - 30$)**: Simple factual/definitional queries $\rightarrow$ routes to **Hyper-Lite**.
+- **Medium Complexity ($31 - 60$)**: Moderate queries within Lite capacity $\rightarrow$ routes to **Hyper-Lite** (under default threshold $60$).
+- **High Complexity ($61 - 100$)**: Multi-hop, multi-entity, or comparative queries $\rightarrow$ routes to **Hyper-Core**.
+
+Default threshold:
+```python
+ADAPTIVE_CORE_THRESHOLD = 60  # Score >= 60 executes Hyper-Core; < 60 executes Hyper-Lite
+```
+
+### How to Enable Adaptive Mode
+Set in `.env` (or via environment variables):
+```bash
+ADAPTIVE_RAG_ENABLED=true
+ADAPTIVE_RAG_MODE=adaptive
+ADAPTIVE_CORE_THRESHOLD=60
+ADAPTIVE_LOG_DECISIONS=true
+```
+
+In Python code, `mode="adaptive"` is supported directly:
+```python
+from hyperrag import HyperRAG, QueryParam
+
+rag = HyperRAG(...)
+# Automatically routes to Lite or Core:
+response = rag.query("What is diabetes?", param=QueryParam(mode="adaptive"))
+```
+
+### How to Manually Force Lite or Core
+Direct manual execution remains fully available and bypasses the router:
+```python
+# Force Hyper-Lite (always executes Lite pipeline):
+response = rag.query("Compare A and B", param=QueryParam(mode="lite"))
+
+# Force Hyper-Core (always executes Core hypergraph pipeline):
+response = rag.query("What is diabetes?", param=QueryParam(mode="core"))
+```
+
+### How to Inspect Routing Decisions
+1. **Via `AdaptiveRouter` directly**:
+```python
+from hyperrag import AdaptiveRouter
+
+router = AdaptiveRouter()
+print(router.inspect_query("Compare diabetes and hypertension in terms of causes and treatment."))
+```
+Output:
+```
+Query:
+Compare diabetes and hypertension in terms of causes and treatment.
+
+Score:
+86
+
+Detected:
+comparison=True
+causal=True
+multi_hop=True
+multi_aspect=True
+entity_count=5
+
+Selected:
+CORE
+
+Reasons:
+multiple entities (5 detected)
+multiple requested aspects (3 aspects)
+comparison detected
+causal reasoning detected
+multi-hop structure detected
+```
+
+2. **Via HyperRAG query metadata**:
+```python
+rag.query("What is diabetes?", param=QueryParam(mode="adaptive"))
+decision = rag.last_adaptive_decision
+print(decision.score, decision.mode, decision.reason)
+```
+
 ## :memo: License
 
 This project is under license from Apache 2.0. For more details, see the [LICENSE](LICENSE.md) file.
