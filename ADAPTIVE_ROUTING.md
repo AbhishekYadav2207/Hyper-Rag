@@ -103,7 +103,10 @@ Hyper-Lite                 Hyper-Core
 | `.env.example` | Environment Variables | Documents default variables, recommended thresholds, and logging toggles for deployments. |
 | `config_temp.py` | Configuration Template | Provides configuration support and fallback definitions. |
 | `service_api.py` | FastAPI Service Layer | Validates incoming modes (`adaptive`, `core`, `lite`, etc.) and returns structured `adaptive_decision` metadata in `QueryResponse`. |
-| `test_adaptive_router.py` | Test Suite | Isolated unit tests validating all complexity dimensions, boundary conditions, and manual mode guarantees. |
+| `test_adaptive_router.py` | Test Suite | Isolated unit tests validating Phase 1 & 2.1 complexity dimensions, boundary conditions, and short-query semantic density. |
+| `test_retrieval_sufficiency.py` | Test Suite | Isolated unit tests validating Phase 2 retrieval sufficiency evaluation, scoring formulas, and escalation policies. |
+| `test_key_rotation.py` | Test Suite | Isolated unit tests validating multi-key pool rotation, 429 backoff, 401 handling, embedding isolation, and concurrency. |
+| `test_config.py` | Test Suite | Validates configuration loading, environment parsing, and key initialization. |
 | `README.md` | User-Facing Documentation | Provides setup instructions, architecture descriptions, and user guidance for adaptive routing. |
 
 ---

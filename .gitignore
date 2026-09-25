@@ -134,6 +134,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -187,9 +189,8 @@ web-ui/backend/files.db
 # Local test scripts
 test_cache/
 /test_*.py
-!/test_adaptive_router.py
-!/test_retrieval_sufficiency.py
-!/test_config.py
+
+/test_key_rotation.py
 reproduce/Step_nvidia_test.py
 reproduce/Step_extraction_debug.py
 reproduce/Step_reasoning_test.py

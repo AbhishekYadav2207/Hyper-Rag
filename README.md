@@ -96,14 +96,16 @@ pip install -r requirements.txt
 Copy the `config_temp.py` file to `my_config.py` in the root folder and set your LLM `URL` and `KEY`.
 
 ```python
-LLM_BASE_URL = "Yours xxx"
-LLM_API_KEY = "Yours xxx"
-LLM_MODEL = "gpt-4o-mini"
+# OPENROUTER - ONLY LLM PROVIDER
+OPENROUTER_API_KEYS = "your_openrouter_api_key"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
-EMB_BASE_URL = "Yours xxx"
-EMB_API_KEY = "Yours xxx"
-EMB_MODEL = "text-embedding-3-small"
-EMB_DIM = 1536
+# MISTRAL - EMBEDDINGS ONLY
+EMB_API_KEYS = "your_mistral_api_key"
+EMB_BASE_URL = "https://api.mistral.ai/v1"
+EMB_MODEL = "mistral-embed"
+EMB_DIM = 1024
 ```
 
 ### Run the toy example
@@ -151,6 +153,40 @@ We provide a web-based visualization tool for hypergraphs and lightweight Hyper-
 *Note: We welcome any contributions to improve it.*
 ![vis-qa](./assets/vis-QA.png)
 ![vis-hg](./assets/vis-hg.png)
+
+## 📁 Repository Structure
+
+```text
+Hyper-RAG/
+├── hyperrag/                     # Core Hyper-RAG library implementation
+│   ├── adaptive_router.py        # Phase 1: Query complexity analyzer & router
+│   ├── retrieval_sufficiency.py  # Phase 2: Post-retrieval sufficiency evaluator
+│   ├── key_pool.py               # API key rotation, cooldown, and backoff engine
+│   ├── llm.py                    # LLM (OpenRouter) & embedding (Mistral) client calls
+│   └── hyperrag.py               # HyperRAG orchestrator & escalation pipeline
+├── datasets/                     # Domain-specific evaluation datasets (local)
+├── docs/                         # Technical documentation & architecture guides
+├── evaluate/                     # Scoring-based and selection-based assessment utilities
+├── examples/                     # Standalone usage demos and mock data
+├── reproduce/                    # Step-by-step benchmark and reproduction scripts
+├── web-ui/                       # Full-stack Web Console (React frontend + FastAPI backend)
+├── assets/                       # Architecture diagrams and benchmark figures
+├── test_adaptive_router.py       # Unit tests for Phase 1 & Phase 2.1 query routing
+├── test_retrieval_sufficiency.py # Unit tests for Phase 2 sufficiency evaluation
+├── test_key_rotation.py          # Unit tests for multi-key pool rotation & backoff
+├── test_config.py                # Unit tests for configuration validation
+├── service_api.py                # FastAPI REST and streaming server
+├── testHTML_light.html           # Lightweight browser console for service_api
+├── pilot_benchmark.py            # Pilot benchmark with matrix-backed embedding lookup
+├── run_full_benchmark.py         # Comprehensive 39-query evaluation benchmark suite
+├── benchmark_results.json        # Validated 39-query benchmark results
+├── threshold_analysis.json       # Validated threshold sensitivity analysis (40, 50, 60, 70)
+├── config_temp.py                # Configuration template for local setup
+├── .env.example                  # Environment variable deployment template
+└── requirements.txt              # Python package dependencies
+```
+
+> **Maintenance Note**: Generated caches (`caches/`), local datasets (`datasets/`), secrets (`.env`, `my_config.py`), temporary benchmark artifacts, and local test outputs are excluded from version control.
 
 ## :whale: Docker Deployment
 
@@ -477,7 +513,7 @@ Example Log Output:
 
 ## :memo: License
 
-This project is under license from Apache 2.0. For more details, see the [LICENSE](LICENSE.md) file.
+This project is under license from Apache 2.0. For more details, see the [LICENSE](LICENSE) file.
 
 Hyper-RAG is maintained by [iMoon-Lab](http://moon-lab.tech/), Tsinghua University. 
 Made with :heart: by <a href="https://github.com/yifanfeng97" target="_blank">Yifan Feng</a>, <a href="https://github.com/haoohu" target="_blank">Hao Hu</a>, <a href="https://github.com/yifanfeng97" target="_blank">Xingliang Hou</a>, <a href="https://github.com/yifanfeng97" target="_blank">Shiquan Liu</a>, <a href="https://github.com/FuYou0723" target="_blank">Yifan Zhang</a>, <a href="https://github.com/yuxizhe" target="_blank">Xizhe Yu</a>. 
