@@ -6,21 +6,21 @@
     "escalations": 3
   },
   "50": {
-    "initial_lite": 23,
+    "initial_lite": 22,
     "final_lite": 19,
     "final_core": 20,
-    "escalations": 4
+    "escalations": 3
   },
   "60": {
-    "initial_lite": 32,
+    "initial_lite": 30,
     "final_lite": 27,
     "final_core": 12,
-    "escalations": 5
+    "escalations": 3
   },
   "70": {
-    "initial_lite": 36,
-    "final_lite": 31,
-    "final_core": 8,
-    "escalations": 5
+    "initial_lite": 35,
+    "final_lite": 32,
+    "final_core": 7,
+    "escalations": 3
   }
 }

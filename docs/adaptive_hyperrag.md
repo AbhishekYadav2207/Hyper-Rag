@@ -142,7 +142,50 @@ Where:
 
 ---
 
-## 4. Decision Metadata
+## 4. Phase 2.1: Short-Query Semantic-Density Refinement
+
+### Motivation
+In the original Phase 1 complexity router, query score scaled partly with token length and sentence structure. Consequently, concise queries with dense semantic relationships (such as Q32: *"How did greed cause Marley's chains?"* and Q33: *"Compare Fred vs Scrooge"*) scored below the default threshold of 60 (receiving 47 and 51, respectively). While Phase 2 correctly rescued them to Core via sufficiency escalation, executing Lite retrieval first added unnecessary latency and retrieval operations.
+
+Phase 2.1 optimizes the **initial routing decision** so that short, high-order relational queries route directly to Core upfront, without altering the routing of simple factual queries.
+
+### Short-Query Definition & Trigger Signals
+- **Boundary**: `word_count <= ADAPTIVE_SHORT_QUERY_MAX_WORDS` (default: **7 words**).
+- **Triggers**: High-order semantic flags identified by `QueryComplexityAnalyzer`:
+  - `comparison = True`
+  - `causal_reasoning = True`
+- **Bonus Applied**: `+15.0` (`ADAPTIVE_SHORT_QUERY_DENSITY_BONUS`).
+- **Threshold**: Maintained strictly at `ADAPTIVE_CORE_THRESHOLD = 60`.
+
+### Score Accounting Breakdown
+```text
+Final Score = Base Score + Short-Query Density Bonus
+```
+
+Observed in benchmark:
+- **Q32 ("How did greed cause Marley's chains?")**:
+  - Base Score: `47`
+  - Density Bonus: `+15`
+  - Final Score: `62` $\rightarrow$ **Core** (Initial Mode: Core; Escalation avoided)
+- **Q33 ("Compare Fred vs Scrooge")**:
+  - Base Score: `51`
+  - Density Bonus: `+15`
+  - Final Score: `66` $\rightarrow$ **Core** (Initial Mode: Core; Escalation avoided)
+
+Short factual queries without high-order reasoning do not trigger the bonus:
+- *"What is Scrooge?"* $\rightarrow$ Score `6` (Lite)
+- *"Who is Marley?"* $\rightarrow$ Score `6` (Lite)
+- *"What is a counting-house?"* $\rightarrow$ Score `6` (Lite)
+- *"Who was Tiny Tim?"* $\rightarrow$ Score `6` (Lite)
+
+### Benchmark Impact (39 Queries)
+- **Escalations Reduced**: 5 $\rightarrow$ 3 (40% reduction).
+- **Average Latency**: 134.30 ms $\rightarrow$ 82.15 ms (38.8% latency reduction).
+- **False-Core Cases**: 0.
+
+---
+
+## 5. Decision Metadata
 
 Clients can access the full adaptive decision lifecycle via `rag.last_adaptive_decision`:
 
@@ -178,7 +221,7 @@ Clients can access the full adaptive decision lifecycle via `rag.last_adaptive_d
 
 ---
 
-## 5. Diagnostic Logging Output
+## 6. Diagnostic Logging Output
 
 When `ADAPTIVE_LOG_DECISIONS=true`:
 

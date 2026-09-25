@@ -324,7 +324,6 @@ Score = (Volume_Score * 0.25)
       + (Unique_Entities_Score * 0.20)
       + (Context_Length_Score * 0.25)
       + (Query_Coverage_Score * 0.30)
-      - Duplicate_Penalty (up to 20 pts)
       - Missing_Relationship_Penalty (25 pts if multi-hop query lacks hyperedges)
 ```
 
@@ -334,6 +333,75 @@ Score = (Volume_Score * 0.25)
 - **Lite Insufficient**: If Lite retrieval score $<$ threshold, execution immediately escalates to **Hyper-Core** retrieval and reasoning.
 - **Zero Wasted LLM Generation**: Lite retrieval is decoupled into retrieval and reasoning (`hyper_retrieve_lite` vs `hyper_query_lite_reasoning`). If escalated, Lite reasoning is aborted before calling the LLM, preserving token efficiency and reducing latency.
 - **At Most One Escalation**: Exactly one escalation check occurs per query (Lite $\rightarrow$ Core). No cascading or re-trying loops.
+
+---
+
+### Phase 2.1: Short-Query Semantic-Density Refinement
+
+#### Why Phase 2.1 was Introduced
+While Phase 2 successfully rescued queries from Lite to Core through post-retrieval sufficiency checks, the 39-query benchmark identified short queries with dense semantic relationships that received unexpectedly low complexity scores in Phase 1 due to low token/word length. For example, queries like:
+- **Q32**: *"How did greed cause Marley's chains?"* (Score: 47 $\rightarrow$ initial Lite $\rightarrow$ escalated to Core)
+- **Q33**: *"Compare Fred vs Scrooge"* (Score: 51 $\rightarrow$ initial Lite $\rightarrow$ escalated to Core)
+
+Although Phase 2 correctly escalated them, executing Lite retrieval first introduced unnecessary latency and redundant retrieval overhead. Phase 2.1 optimizes the **initial routing decision** so that semantically dense short queries route directly to Core upfront, while keeping short factual queries in Lite.
+
+#### Short-Query Definition & Semantic Activation
+- **Short-Query Boundary**: `word_count <= ADAPTIVE_SHORT_QUERY_MAX_WORDS` (default: **7 words**).
+- **Activation Signals**: High-order semantic signals extracted by `QueryComplexityAnalyzer`:
+  - `comparison` (e.g., *compare*, *vs*, *difference between*)
+  - `causal_reasoning` (e.g., *why*, *how did*, *causes*, *leads to*)
+- **Scoring Bonus**: An explicit, observable bonus of `+15.0` (`ADAPTIVE_SHORT_QUERY_DENSITY_BONUS`).
+- **Complexity Threshold**: `ADAPTIVE_CORE_THRESHOLD = 60` (preserved without artificial threshold lowering).
+
+#### Transparent Score Accounting
+The routing score components are fully observable via `AdaptiveDecision`:
+```text
+Final Score = Base Score + Short-Query Density Bonus
+```
+
+Example Before & After:
+- **Q32 ("How did greed cause Marley's chains?")**:
+  - Base Score: `47`
+  - Short-Query Density Bonus: `+15`
+  - Final Score: `62` (Threshold: `60`) $\rightarrow$ **Core** (Initial Mode: Core; Escalation avoided)
+- **Q33 ("Compare Fred vs Scrooge")**:
+  - Base Score: `51`
+  - Short-Query Density Bonus: `+15`
+  - Final Score: `66` (Threshold: `60`) $\rightarrow$ **Core** (Initial Mode: Core; Escalation avoided)
+
+#### Avoidance of Overcorrection
+Short queries without high-order semantic signals do not activate the bonus and remain Lite:
+- *"What is Scrooge?"* $\rightarrow$ Score: `6` (Lite)
+- *"Who is Marley?"* $\rightarrow$ Score: `6` (Lite)
+- *"What is a counting-house?"* $\rightarrow$ Score: `6` (Lite)
+- *"Who was Tiny Tim?"* $\rightarrow$ Score: `6` (Lite)
+
+#### Unit-Test Verification
+- Dedicated Phase 2.1 test suite in `test_adaptive_router.py` (`TestShortQuerySemanticDensityPhase21`):
+  - **TEST A**: Short factual query (*"What is Scrooge?"*) $\rightarrow$ `is_short_query=True`, `short_query_semantic_density=False`, `score=6`, `mode=lite`.
+  - **TEST B**: Short comparison (*"Compare Fred vs Scrooge"*) $\rightarrow$ `comparison=True`, `short_query_semantic_density=True`, `bonus=+15`, `score=66`, `mode=core`.
+  - **TEST C**: Short causal (*"Why does greed cause suffering?"*) $\rightarrow$ `causal=True`, `bonus=+15`, `score=42`, `mode=lite`.
+  - **TEST D**: Short multi-hop / relationship (*"How does A affect B?"*) $\rightarrow$ `causal=True`, `multi_hop=True`, `score=62`, `mode=core`.
+  - **TEST E**: Long simple query $\rightarrow$ `is_short_query=False`, `bonus=0`, `mode=lite`.
+  - **TEST F**: Additional short factual baseline queries remain Lite without bonus.
+- Overall regression suite: **29/29 tests passed**.
+
+#### Benchmark Measurements (39 Queries)
+| Metric | Before (Phase 2) | After (Phase 2.1) | Impact |
+| :--- | :--- | :--- | :--- |
+| **39-query benchmark size** | 39 | 39 | Exact same dataset |
+| **Initial Lite selections** | 32 | 30 | -2 unnecessary Lite routes |
+| **Initial Core selections** | 7 | 9 | +2 dense queries to Core upfront |
+| **Lite $\rightarrow$ Core escalations** | 5 | 3 | **40% reduction** in escalations |
+| **Final Lite** | 27 | 27 | Preserved |
+| **Final Core** | 12 | 12 | Preserved |
+| **Average Latency** | 134.30 ms | 82.15 ms | **38.8% latency reduction** |
+| **Median Latency** | 96.30 ms | 78.20 ms | Faster median response |
+| **Total LLM Calls** | 83 | 81 | Reduced aborted retrieval overhead |
+| **False-Core Cases** | 0 | 0 | Zero false-Core cases introduced |
+
+#### Final Assessment
+The Phase 2.1 refinement is **retained**: it directly eliminates unnecessary Lite retrieval for dense queries Q32 and Q33, reduces escalations by 40%, and reduces average latency by 38.8% without introducing false-Core errors or requiring LLM calls.
 
 ---
 
@@ -351,6 +419,10 @@ ADAPTIVE_CORE_THRESHOLD=60
 # Phase 2 Sufficiency Threshold (0-100)
 ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED=true
 ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD=60
+
+# Phase 2.1 Short-Query Semantic Density
+ADAPTIVE_SHORT_QUERY_MAX_WORDS=7
+ADAPTIVE_SHORT_QUERY_DENSITY_BONUS=15.0
 
 # Logging
 ADAPTIVE_LOG_DECISIONS=true

@@ -17,6 +17,8 @@ from my_config import (
     ADAPTIVE_RAG_MODE,
     ADAPTIVE_CORE_THRESHOLD,
     ADAPTIVE_LOG_DECISIONS,
+    ADAPTIVE_SHORT_QUERY_MAX_WORDS,
+    ADAPTIVE_SHORT_QUERY_DENSITY_BONUS,
 )
 
 logger = logging.getLogger("hyper_rag")
@@ -51,6 +53,9 @@ class QueryFeatures:
     depth_signals: List[str]
     relationship_reasoning: bool
     relationship_signals: List[str]
+    # Phase 2.1: Short-query semantic density features
+    is_short_query: bool = False
+    short_query_semantic_density: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Return features formatted for structured routing decision."""
@@ -69,6 +74,8 @@ class QueryFeatures:
             "detailed_depth": self.detailed_depth,
             "relationship_reasoning": self.relationship_reasoning,
             "detected_entities": self.detected_entities,
+            "is_short_query": self.is_short_query,
+            "short_query_semantic_density": self.short_query_semantic_density,
         }
 
 
@@ -92,6 +99,9 @@ class AdaptiveDecision:
     escalated: bool = False
     escalation_reason: Optional[str] = None
     retrieval_metrics: Optional[Dict[str, Any]] = None
+    # Phase 2.1: Score accounting breakdown
+    base_score: Optional[int] = None
+    short_query_density_bonus: float = 0.0
 
     def __post_init__(self):
         if self.initial_mode is None:
@@ -100,6 +110,8 @@ class AdaptiveDecision:
             self.initial_complexity_score = self.score
         if self.final_mode is None:
             self.final_mode = self.mode
+        if self.base_score is None:
+            self.base_score = self.score
 
     def to_dict(self) -> Dict[str, Any]:
         d = {
@@ -118,7 +130,10 @@ class AdaptiveDecision:
             ),
             "final_mode": self.final_mode or self.mode,
             "escalated": self.escalated,
+            "base_score": self.base_score if self.base_score is not None else self.score,
         }
+        if self.short_query_density_bonus > 0:
+            d["short_query_density_bonus"] = self.short_query_density_bonus
         if self.retrieval_sufficiency_score is not None:
             d["retrieval_sufficiency_score"] = self.retrieval_sufficiency_score
         if self.retrieval_sufficient is not None:
@@ -131,18 +146,22 @@ class AdaptiveDecision:
 
     def format_log(self) -> str:
         """Format the decision for clean, readable logging without secrets."""
+        score_info = f"Query complexity score: {self.score}"
+        if self.short_query_density_bonus > 0:
+            score_info += f" (base: {self.base_score}, density bonus: +{int(self.short_query_density_bonus)})"
+
         if len(self.reasons) > 1:
             reasons_formatted = "\n".join(f"- {r}" for r in self.reasons)
             return (
                 f"[Adaptive RAG]\n"
-                f"Query complexity score: {self.score}\n"
+                f"{score_info}\n"
                 f"Selected mode: {self.mode}\n"
                 f"Reasons:\n{reasons_formatted}"
             )
         else:
             return (
                 f"[Adaptive RAG]\n"
-                f"Query complexity score: {self.score}\n"
+                f"{score_info}\n"
                 f"Selected mode: {self.mode}\n"
                 f"Reason: {self.reason}"
             )
@@ -164,14 +183,21 @@ class AdaptiveDecision:
             detected_items.append("multi_aspect=True")
         if self.features.get("detailed_depth"):
             detected_items.append("depth=True")
+        if self.features.get("short_query_semantic_density"):
+            detected_items.append("short_query_semantic_density=True")
         detected_items.append(f"entity_count={self.features.get('entity_count', 0)}")
+        detected_items.append(f"word_count={self.features.get('word_count', 0)}")
 
         detected_str = "\n".join(detected_items)
         reasons_str = "\n".join(self.reasons) if self.reasons else self.reason
 
+        score_line = f"{self.score}"
+        if self.short_query_density_bonus > 0:
+            score_line += f" (Base: {self.base_score} + Density Bonus: {int(self.short_query_density_bonus)})"
+
         return (
             f"Query:\n{self.query}\n\n"
-            f"Score:\n{self.score}\n\n"
+            f"Score:\n{score_line}\n\n"
             f"Detected:\n{detected_str}\n\n"
             f"Selected:\n{self.mode.upper()}\n\n"
             f"Reasons:\n{reasons_str}"
@@ -205,6 +231,10 @@ class ComplexityWeights:
     length_weight_max: float = 10.0
     sentence_weight_max: float = 6.0
     question_weight_max: float = 4.0
+
+    # Phase 2.1: Short-query semantic density
+    short_query_max_words: int = ADAPTIVE_SHORT_QUERY_MAX_WORDS
+    short_query_density_bonus: float = ADAPTIVE_SHORT_QUERY_DENSITY_BONUS
 
 
 # =============================================================================
@@ -380,7 +410,7 @@ class QueryComplexityAnalyzer:
         return unique_entities
 
     @classmethod
-    def analyze(cls, query: str) -> QueryFeatures:
+    def analyze(cls, query: str, max_short_words: Optional[int] = None) -> QueryFeatures:
         """Analyze query text and return QueryFeatures."""
         q_clean = query.strip()
         words = q_clean.split()
@@ -471,6 +501,15 @@ class QueryComplexityAnalyzer:
                 depth_signals.extend([s if isinstance(s, str) else s[0] for s in m])
         detailed_depth = len(depth_signals) > 0
 
+        # Phase 2.1: Short-query semantic density
+        limit_short_words = (
+            max_short_words
+            if max_short_words is not None
+            else ADAPTIVE_SHORT_QUERY_MAX_WORDS
+        )
+        is_short_query = word_count <= limit_short_words
+        short_query_semantic_density = is_short_query and (comparison or causal_reasoning)
+
         return QueryFeatures(
             query_length=query_length,
             word_count=word_count,
@@ -494,12 +533,34 @@ class QueryComplexityAnalyzer:
             depth_signals=depth_signals,
             relationship_reasoning=relationship_reasoning,
             relationship_signals=relationship_signals,
+            is_short_query=is_short_query,
+            short_query_semantic_density=short_query_semantic_density,
         )
 
 
 # =============================================================================
 # 3. MODULAR SCORING ENGINE
 # =============================================================================
+
+@dataclass
+class ScoreResult:
+    """Result of complexity scoring with Phase 2.1 base score breakdown."""
+    score: int
+    reasons: List[str]
+    primary_reason: str
+    confidence: float
+    base_score: int
+    short_query_density_bonus: float = 0.0
+
+    def __iter__(self):
+        return iter((self.score, self.reasons, self.primary_reason, self.confidence))
+
+    def __getitem__(self, index):
+        return (self.score, self.reasons, self.primary_reason, self.confidence)[index]
+
+    def __len__(self):
+        return 4
+
 
 class BaseComplexityScorer(ABC):
     """Abstract interface for query complexity scoring, enabling modular future classifiers."""
@@ -526,7 +587,7 @@ class HeuristicComplexityScorer(BaseComplexityScorer):
 
     def score(
         self, features: QueryFeatures, threshold: int
-    ) -> Tuple[int, List[str], str, float]:
+    ) -> ScoreResult:
         raw_score: float = 0.0
         reasons: List[str] = []
 
@@ -604,7 +665,29 @@ class HeuristicComplexityScorer(BaseComplexityScorer):
             raw_score += w.depth_weight
             reasons.append("detailed in-depth analysis requested")
 
+        # 11. Phase 2.1: Short-Query Semantic Density Bonus
+        base_score_raw = raw_score
+        density_bonus = 0.0
+
+        has_density = (
+            getattr(features, "short_query_semantic_density", False)
+            or (
+                getattr(features, "is_short_query", False)
+                and (features.comparison or features.causal_reasoning)
+            )
+            or (
+                features.word_count <= w.short_query_max_words
+                and (features.comparison or features.causal_reasoning)
+            )
+        )
+
+        if has_density:
+            density_bonus = w.short_query_density_bonus
+            raw_score += density_bonus
+            reasons.append("short-query semantic density detected")
+
         # Clamp score to [0, 100]
+        base_score = int(min(100, max(0, round(base_score_raw))))
         final_score = int(min(100, max(0, round(raw_score))))
 
         # Determine primary reason summary
@@ -630,7 +713,14 @@ class HeuristicComplexityScorer(BaseComplexityScorer):
             confidence = 0.5 + 0.5 * ((threshold - final_score) / denom)
         confidence = round(min(1.0, max(0.5, confidence)), 2)
 
-        return final_score, reasons, primary_reason, confidence
+        return ScoreResult(
+            score=final_score,
+            reasons=reasons,
+            primary_reason=primary_reason,
+            confidence=confidence,
+            base_score=base_score,
+            short_query_density_bonus=density_bonus,
+        )
 
 
 # =============================================================================
@@ -667,17 +757,19 @@ class AdaptiveRouter:
 
     def analyze_query(self, query: str) -> QueryFeatures:
         """Extract interpretable structural and semantic query features."""
-        return QueryComplexityAnalyzer.analyze(query)
+        return QueryComplexityAnalyzer.analyze(
+            query, max_short_words=self.weights.short_query_max_words
+        )
 
     def calculate_complexity(
         self, query: str, features: Optional[QueryFeatures] = None
     ) -> Tuple[int, List[str], str, float, QueryFeatures]:
         """Calculate complexity score and explainable reasons for a query."""
         feat = features or self.analyze_query(query)
-        score, reasons, primary_reason, confidence = self.scorer.score(
+        res = self.scorer.score(
             feat, threshold=self.core_threshold
         )
-        return score, reasons, primary_reason, confidence, feat
+        return res.score, res.reasons, res.primary_reason, res.confidence, feat
 
     def select_mode(self, score: int) -> Literal["lite", "core"]:
         """Determine mode from score and threshold."""
@@ -689,20 +781,22 @@ class AdaptiveRouter:
         Logs routing decision cleanly if log_decisions is True.
         """
         features = self.analyze_query(query)
-        score, reasons, primary_reason, confidence, _ = self.calculate_complexity(
-            query, features=features
+        res = self.scorer.score(
+            features, threshold=self.core_threshold
         )
-        mode = self.select_mode(score)
+        mode = self.select_mode(res.score)
 
         decision = AdaptiveDecision(
             mode=mode,
-            score=score,
+            score=res.score,
             threshold=self.core_threshold,
-            confidence=confidence,
-            reason=primary_reason,
-            reasons=reasons,
+            confidence=res.confidence,
+            reason=res.primary_reason,
+            reasons=res.reasons,
             features=features.to_dict(),
             query=query,
+            base_score=getattr(res, "base_score", res.score),
+            short_query_density_bonus=getattr(res, "short_query_density_bonus", 0.0),
         )
 
         if self.log_decisions:

@@ -244,6 +244,10 @@ ADAPTIVE_CORE_THRESHOLD=60
 
 # Enable diagnostic decision logging
 ADAPTIVE_LOG_DECISIONS=true
+
+# Phase 2.1: Short-Query Semantic Density
+ADAPTIVE_SHORT_QUERY_MAX_WORDS=7
+ADAPTIVE_SHORT_QUERY_DENSITY_BONUS=15.0
 ```
 
 ### Configuration Behaviors
@@ -251,6 +255,31 @@ ADAPTIVE_LOG_DECISIONS=true
 - `ADAPTIVE_RAG_MODE`: Governs default query behavior when `param.mode` is omitted in client requests.
 - `ADAPTIVE_CORE_THRESHOLD`: Configures the integer boundary ($0-100$) between Lite and Core.
 - `ADAPTIVE_LOG_DECISIONS`: Toggles human-readable terminal logs detailing score breakdowns and selected modes.
+- `ADAPTIVE_SHORT_QUERY_MAX_WORDS`: Max words (default: 7) defining a short query for semantic density detection.
+- `ADAPTIVE_SHORT_QUERY_DENSITY_BONUS`: Additive score bonus (default: 15.0) awarded to short queries with high-order relational signals.
+
+---
+
+## 7.1 Phase 2.1: Short-Query Semantic-Density Refinement
+
+### Purpose & Benchmark Motivation
+The 39-query benchmark exposed a category of short queries with strong relational depth (e.g., Q32: *"How did greed cause Marley's chains?"*, Q33: *"Compare Fred vs Scrooge"*) that received low complexity scores (47 and 51) strictly due to brief token length. Although rescued by Phase 2 retrieval sufficiency escalation, routing them to Lite first caused redundant retrieval passes and elevated latency.
+
+Phase 2.1 refines the Phase 1 complexity router to recognize **dense short queries** upfront.
+
+### Activation Criteria
+A query receives the semantic-density bonus if and only if:
+1. `word_count <= ADAPTIVE_SHORT_QUERY_MAX_WORDS` (7 words)
+2. `features.comparison == True` OR `features.causal_reasoning == True`
+
+### Observable Score Accounting
+```text
+Final Score = Base Score + Short-Query Density Bonus
+```
+
+- **Q32 ("How did greed cause Marley's chains?")**: Base `47` + Bonus `15` = **62** $\rightarrow$ **Core**
+- **Q33 ("Compare Fred vs Scrooge")**: Base `51` + Bonus `15` = **66** $\rightarrow$ **Core**
+- **Factual Short ("What is Scrooge?")**: Base `6` + Bonus `0` = **6** $\rightarrow$ **Lite** (Remains Lite)
 
 ---
 
