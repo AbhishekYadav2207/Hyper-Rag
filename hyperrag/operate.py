@@ -3,7 +3,7 @@ import asyncio
 import json
 import re
 from datetime import datetime
-from typing import Union
+from typing import Union, Optional, Tuple, Dict, Any, List
 from collections import Counter, defaultdict
 import warnings
 
@@ -1302,16 +1302,21 @@ async def hyper_query_stream(
     return
 
 
-async def hyper_query_lite(
+async def hyper_retrieve_lite(
     query,
     knowledge_hypergraph_inst: BaseHypergraphStorage,
     entities_vdb: BaseVectorStorage,
     text_chunks_db: BaseKVStorage[TextChunkSchema],
     query_param: QueryParam,
     global_config: dict,
-) -> str:
-
+) -> Tuple[Optional[dict], str]:
+    """
+    Execute only the Lite retrieval stage (keywords extraction + entity query context)
+    without performing final LLM reasoning generation.
+    Returns: (entity_context_dict, entity_keywords_str)
+    """
     entity_context = None
+    entity_keywords = ""
     use_model_func = global_config["llm_model_func"]
 
     kw_prompt_temp = PROMPTS["keywords_extraction"]
@@ -1335,19 +1340,11 @@ async def hyper_query_lite(
             keywords_data = json.loads(result)
             entity_keywords = keywords_data.get("low_level_keywords", [])
             entity_keywords = ", ".join(entity_keywords)
-        # Handle parsing error
         except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
-            return PROMPTS["fail_response"]
-    """
-        Perform different actions based on keywords:
-            ll_keywords: Find information based on low-level keywords.
-    """
+            logger.warning(f"Keywords JSON parsing error in hyper_retrieve_lite: {e}")
+            return None, ""
+
     if entity_keywords:
-        """
-        low_level_context: Retrieves vertices and their first-order neighbor hyperedges.
-        high_level_context: Retrieves hyperedges and their first-order neighbor vertices.
-        """
         entity_context = await _build_entity_query_context(
             entity_keywords,
             knowledge_hypergraph_inst,
@@ -1355,24 +1352,32 @@ async def hyper_query_lite(
             text_chunks_db,
             query_param,
         )
+
+    return entity_context, entity_keywords
+
+
+async def hyper_query_lite_reasoning(
+    query: str,
+    entity_context: Optional[dict],
+    entity_keywords: str,
+    query_param: QueryParam,
+    global_config: dict,
+) -> str:
     """
-        combine the information from the local_query and global_query,
-        so that we can have the final retrieval information.
+    Execute final LLM reasoning generation given already retrieved Lite entity context.
     """
-    context = entity_context.get("context")
+    use_model_func = global_config["llm_model_func"]
+    context = entity_context.get("context") if entity_context else None
 
     if query_param.only_need_context:
-        return context
+        return context or ""
     if context is None:
         return PROMPTS["fail_response"]
+
     define_str = ""
     if entity_keywords:
-        """
-        High-level keywords serve as qualifiers to the topic information
-        """
-        entity_keywords = entity_keywords if entity_keywords else ""
-        define_str = PROMPTS["rag_define"]
-        define_str = define_str.format(ll_keywords=entity_keywords, hl_keywords="")
+        define_str = PROMPTS["rag_define"].format(ll_keywords=entity_keywords, hl_keywords="")
+
     sys_prompt_temp = PROMPTS["rag_response"]
     sys_prompt = sys_prompt_temp.format(
         context_data=context, response_type=query_param.response_type
@@ -1391,10 +1396,35 @@ async def hyper_query_lite(
             .replace("</system>", "")
             .strip()
         )
-    if query_param.return_type == "json":
+    if query_param.return_type == "json" and isinstance(entity_context, dict):
         entity_context["response"] = response
         response = entity_context
     return response
+
+
+async def hyper_query_lite(
+    query,
+    knowledge_hypergraph_inst: BaseHypergraphStorage,
+    entities_vdb: BaseVectorStorage,
+    text_chunks_db: BaseKVStorage[TextChunkSchema],
+    query_param: QueryParam,
+    global_config: dict,
+) -> str:
+    entity_context, entity_keywords = await hyper_retrieve_lite(
+        query,
+        knowledge_hypergraph_inst,
+        entities_vdb,
+        text_chunks_db,
+        query_param,
+        global_config,
+    )
+    return await hyper_query_lite_reasoning(
+        query,
+        entity_context,
+        entity_keywords,
+        query_param,
+        global_config,
+    )
 
 
 async def graph_query(
@@ -1790,56 +1820,19 @@ async def llm_query(
 # Streaming versions (END)
 # =========================
 
-async def hyper_query_lite_stream(
-    query,
-    knowledge_hypergraph_inst: BaseHypergraphStorage,
-    entities_vdb: BaseVectorStorage,
-    text_chunks_db: BaseKVStorage[TextChunkSchema],
+async def hyper_query_lite_stream_from_context(
+    query: str,
+    entity_context: Optional[dict],
+    entity_keywords: str,
     query_param: QueryParam,
     global_config: dict,
 ):
     """
-    hyper_query_lite 的流式版本：逻辑与 hyper_query_lite 相同，只把最后一步 LLM 生成改成 yield token
+    Stream tokens from already retrieved entity context.
     """
-    entity_context = None
-    use_model_func = global_config["llm_model_func"]
     use_model_stream_func = global_config.get("llm_model_stream_func", None)
     if use_model_stream_func is None:
         raise AttributeError("llm_model_stream_func not found; streaming is unavailable.")
-
-    kw_prompt_temp = PROMPTS["keywords_extraction"]
-    kw_prompt = kw_prompt_temp.format(query=query)
-
-    result = await use_model_func(kw_prompt)
-
-    try:
-        keywords_data = json.loads(result)
-        entity_keywords = keywords_data.get("low_level_keywords", [])
-        entity_keywords = ", ".join(entity_keywords)
-    except json.JSONDecodeError:
-        try:
-            result = (
-                result.replace(kw_prompt[:-1], "")
-                .replace("user", "")
-                .replace("model", "")
-                .strip()
-            )
-            result = "{" + result.split("{")[1].split("}")[0] + "}"
-            keywords_data = json.loads(result)
-            entity_keywords = keywords_data.get("low_level_keywords", [])
-            entity_keywords = ", ".join(entity_keywords)
-        except json.JSONDecodeError as e:
-            yield PROMPTS["fail_response"]
-            return
-
-    if entity_keywords:
-        entity_context = await _build_entity_query_context(
-            entity_keywords,
-            knowledge_hypergraph_inst,
-            entities_vdb,
-            text_chunks_db,
-            query_param,
-        )
 
     context = entity_context.get("context") if entity_context else None
 
@@ -1870,6 +1863,36 @@ async def hyper_query_lite_stream(
         if tok:
             yield tok
     return
+
+
+async def hyper_query_lite_stream(
+    query,
+    knowledge_hypergraph_inst: BaseHypergraphStorage,
+    entities_vdb: BaseVectorStorage,
+    text_chunks_db: BaseKVStorage[TextChunkSchema],
+    query_param: QueryParam,
+    global_config: dict,
+):
+    """
+    hyper_query_lite 的流式版本：逻辑与 hyper_query_lite 相同，只把最后一步 LLM 生成改成 yield token
+    """
+    entity_context, entity_keywords = await hyper_retrieve_lite(
+        query,
+        knowledge_hypergraph_inst,
+        entities_vdb,
+        text_chunks_db,
+        query_param,
+        global_config,
+    )
+
+    async for tok in hyper_query_lite_stream_from_context(
+        query,
+        entity_context,
+        entity_keywords,
+        query_param,
+        global_config,
+    ):
+        yield tok
 
 
 async def naive_query_stream(

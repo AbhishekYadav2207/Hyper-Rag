@@ -83,17 +83,51 @@ class AdaptiveDecision:
     reasons: List[str]
     features: Dict[str, Any]
     query: str = ""
+    # Phase 2: Retrieval sufficiency and escalation tracking
+    initial_mode: Optional[str] = None
+    initial_complexity_score: Optional[int] = None
+    retrieval_sufficiency_score: Optional[int] = None
+    retrieval_sufficient: Optional[bool] = None
+    final_mode: Optional[str] = None
+    escalated: bool = False
+    escalation_reason: Optional[str] = None
+    retrieval_metrics: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self):
+        if self.initial_mode is None:
+            self.initial_mode = self.mode
+        if self.initial_complexity_score is None:
+            self.initial_complexity_score = self.score
+        if self.final_mode is None:
+            self.final_mode = self.mode
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "mode": self.mode,
+        d = {
+            "mode": self.final_mode or self.mode,
             "score": self.score,
             "threshold": self.threshold,
             "confidence": self.confidence,
             "reason": self.reason,
             "reasons": self.reasons,
             "features": self.features,
+            "initial_mode": self.initial_mode or self.mode,
+            "initial_complexity_score": (
+                self.initial_complexity_score
+                if self.initial_complexity_score is not None
+                else self.score
+            ),
+            "final_mode": self.final_mode or self.mode,
+            "escalated": self.escalated,
         }
+        if self.retrieval_sufficiency_score is not None:
+            d["retrieval_sufficiency_score"] = self.retrieval_sufficiency_score
+        if self.retrieval_sufficient is not None:
+            d["retrieval_sufficient"] = self.retrieval_sufficient
+        if self.escalation_reason is not None:
+            d["escalation_reason"] = self.escalation_reason
+        if self.retrieval_metrics is not None:
+            d["retrieval_metrics"] = self.retrieval_metrics
+        return d
 
     def format_log(self) -> str:
         """Format the decision for clean, readable logging without secrets."""

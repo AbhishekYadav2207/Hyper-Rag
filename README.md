@@ -234,16 +234,48 @@ We conducted an efficiency analysis of our Hyper-RAG method using GPT-4o mini on
   <img src="./assets/speed_all.svg" alt="Efficiency analysis" width="60%" />
 </div>
 
-## 🔀 Adaptive Hyper-RAG (Routing Layer)
+## 🔀 Adaptive Hyper-RAG
 
-### What Adaptive Hyper-RAG is
-Adaptive Hyper-RAG introduces a lightweight deterministic routing layer above the existing Hyper-Lite and Hyper-Core retrieval pipelines. Instead of manually specifying whether a query should use lightweight entity-focused retrieval or full high-order hyperedge reasoning, the router analyzes query characteristics and selects the mode dynamically.
+Adaptive Hyper-RAG is a multi-phase system designed to balance execution cost, latency, and retrieval quality by dynamically selecting between **Hyper-Lite** (lightweight entity-focused retrieval) and **Hyper-Core** (high-order hypergraph structure and reasoning).
 
-### Why it was added
+```text
+User Query
+    ↓
+[Phase 1] Adaptive Query Router (Deterministic Complexity Scoring)
+    ↓
+Initial Mode Decision: Hyper-Lite OR Hyper-Core
+    ├── If Hyper-Core:
+    │      ↓
+    │   Hyper-Core Retrieval → High-Order Reasoning → Answer
+    │
+    └── If Hyper-Lite:
+           ↓
+        Hyper-Lite Retrieval (Keywords & Entities)
+           ↓
+        [Phase 2] Retrieval Sufficiency Evaluator (Deterministic & Local)
+           ↓
+        Sufficient Evidence?
+            ├── YES (Score >= Threshold):
+            │      ↓
+            │   Hyper-Lite Reasoning → Answer (Remains Lite)
+            │
+            └── NO (Score < Threshold / Weak Evidence):
+                   ↓
+                [Escalation] Escalate to Hyper-Core Retrieval & Reasoning → Answer
+```
+
+---
+
+### Phase 1: Deterministic Query Complexity Routing
+
+#### What Phase 1 is
+The Phase 1 router makes a pre-retrieval decision based entirely on query complexity. It evaluates query characteristics to select an initial execution mode (`lite` or `core`) without any LLM calls.
+
+#### Why it was added
 - **Query Diversity**: Simple single-entity factual queries often require only low-level entity context (Hyper-Lite), whereas multi-entity, comparative, or multi-hop queries benefit from high-order relationship hyperedges (Hyper-Core).
-- **Zero API Overhead**: The initial routing layer is strictly deterministic and heuristic-driven—it makes **no LLM calls** for routing, avoiding extra latency, API usage, or token costs.
+- **Zero API Overhead**: Strictly deterministic and rule-driven—it makes **no LLM calls** for routing, avoiding extra latency, API usage, or token costs.
 
-### What Features are Considered
+#### Features Considered in Phase 1
 The router evaluates 12 interpretable signals across 8 feature categories:
 1. **Multi-Aspect Questions**: Conjunctions (`and`, `as well as`, `including`), clause enumerations, and comma-separated lists.
 2. **Comparison**: Explicit comparative indicators (`compare`, `versus`, `difference`, `between X and Y`).
@@ -255,7 +287,7 @@ The router evaluates 12 interpretable signals across 8 feature categories:
 8. **Requested Depth**: Explicit depth markers (`detailed`, `in-depth`, `exhaustive`, `step by step`).
 9. **Structural Complexity**: Word length, sentence count, and question marks.
 
-### How Complexity is Calculated & Thresholds Work
+#### Phase 1 Scoring & Thresholds
 Each detected feature contributes points to a transparent $0$ to $100$ score:
 - **Low Complexity ($0 - 30$)**: Simple factual/definitional queries $\rightarrow$ routes to **Hyper-Lite**.
 - **Medium Complexity ($31 - 60$)**: Moderate queries within Lite capacity $\rightarrow$ routes to **Hyper-Lite** (under default threshold $60$).
@@ -266,73 +298,109 @@ Default threshold:
 ADAPTIVE_CORE_THRESHOLD = 60  # Score >= 60 executes Hyper-Core; < 60 executes Hyper-Lite
 ```
 
-### How to Enable Adaptive Mode
-Set in `.env` (or via environment variables):
+---
+
+### Phase 2: Retrieval Sufficiency & Automatic Lite → Core Escalation
+
+#### What Phase 2 is
+While Phase 1 inspects the query *before* retrieval, Phase 2 inspects the actual retrieval artifacts *after* Lite retrieval has run, but *before* generating an LLM response. If Lite retrieval produces empty, duplicate, or insufficient relational evidence for the query's complexity, the system automatically escalates execution to **Hyper-Core**.
+
+#### Why Phase 2 was added
+A query may appear deceptively simple syntactically (e.g. `Score = 35`), but Lite retrieval might only return disconnected fragments, empty results, or lack relationship paths needed to answer the question. Rather than returning an under-informed answer, Phase 2 evaluates retrieval sufficiency and escalates to Core when needed.
+
+#### Retrieval Signals Used in Phase 2
+The `RetrievalSufficiencyEvaluator` evaluates concrete signals extracted from Lite retrieval:
+1. **Item Volume**: Number of retrieved knowledge entities and context items.
+2. **Unique Entities**: Diversity of distinct entities retrieved.
+3. **Context Length**: Total character length of retrieved context chunks.
+4. **Query Entity Coverage**: Lexical and token overlap between query key phrases and retrieved context.
+5. **Duplicate / Redundancy Penalty**: Detection of low-diversity, repetitive context fragments.
+6. **Multi-Hop & Relational Evidence**: For queries requiring causal or multi-hop reasoning, checks whether relational hyperedges or connecting relationships exist. If absent, a significant relational penalty is applied.
+
+#### Transparent Deterministic Formula
+The sufficiency score ($0 - 100$) is computed locally without LLM calls:
+```text
+Score = (Volume_Score * 0.25)
+      + (Unique_Entities_Score * 0.20)
+      + (Context_Length_Score * 0.25)
+      + (Query_Coverage_Score * 0.30)
+      - Duplicate_Penalty (up to 20 pts)
+      - Missing_Relationship_Penalty (25 pts if multi-hop query lacks hyperedges)
+```
+
+#### Escalation Policy
+- **Core Stays Core**: If Phase 1 selected Core (or mode was forced to Core), Hyper-Lite is never run, and no sufficiency check or downgrade occurs.
+- **Lite Sufficient**: If Lite retrieval score $\ge$ `ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD` (default 60), execution proceeds directly with Lite reasoning.
+- **Lite Insufficient**: If Lite retrieval score $<$ threshold, execution immediately escalates to **Hyper-Core** retrieval and reasoning.
+- **Zero Wasted LLM Generation**: Lite retrieval is decoupled into retrieval and reasoning (`hyper_retrieve_lite` vs `hyper_query_lite_reasoning`). If escalated, Lite reasoning is aborted before calling the LLM, preserving token efficiency and reducing latency.
+- **At Most One Escalation**: Exactly one escalation check occurs per query (Lite $\rightarrow$ Core). No cascading or re-trying loops.
+
+---
+
+### Configuration
+
+Add to your `.env` or application configuration:
 ```bash
+# Adaptive RAG Master Controls
 ADAPTIVE_RAG_ENABLED=true
 ADAPTIVE_RAG_MODE=adaptive
+
+# Phase 1 Complexity Threshold (0-100)
 ADAPTIVE_CORE_THRESHOLD=60
+
+# Phase 2 Sufficiency Threshold (0-100)
+ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED=true
+ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD=60
+
+# Logging
 ADAPTIVE_LOG_DECISIONS=true
 ```
 
-In Python code, `mode="adaptive"` is supported directly:
+---
+
+### Usage & Manual Modes
+
+#### Adaptive Execution
 ```python
 from hyperrag import HyperRAG, QueryParam
 
 rag = HyperRAG(...)
-# Automatically routes to Lite or Core:
-response = rag.query("What is diabetes?", param=QueryParam(mode="adaptive"))
+# Automatically routes to Lite, checks sufficiency, and escalates to Core if needed:
+response = rag.query("How does diabetes lead to kidney failure?", param=QueryParam(mode="adaptive"))
 ```
 
-### How to Manually Force Lite or Core
-Direct manual execution remains fully available and bypasses the router:
+#### Direct Manual Overrides
+Manual modes completely bypass the adaptive router and sufficiency escalation:
 ```python
-# Force Hyper-Lite (always executes Lite pipeline):
+# Force Hyper-Lite (always executes Lite pipeline, no escalation):
 response = rag.query("Compare A and B", param=QueryParam(mode="lite"))
 
-# Force Hyper-Core (always executes Core hypergraph pipeline):
+# Force Hyper-Core (always executes Core hypergraph pipeline directly):
 response = rag.query("What is diabetes?", param=QueryParam(mode="core"))
 ```
 
-### How to Inspect Routing Decisions
-1. **Via `AdaptiveRouter` directly**:
+#### Inspecting Decisions and Escalation Metadata
+You can inspect the full adaptive decision lifecycle via `rag.last_adaptive_decision`:
 ```python
-from hyperrag import AdaptiveRouter
-
-router = AdaptiveRouter()
-print(router.inspect_query("Compare diabetes and hypertension in terms of causes and treatment."))
-```
-Output:
-```
-Query:
-Compare diabetes and hypertension in terms of causes and treatment.
-
-Score:
-86
-
-Detected:
-comparison=True
-causal=True
-multi_hop=True
-multi_aspect=True
-entity_count=5
-
-Selected:
-CORE
-
-Reasons:
-multiple entities (5 detected)
-multiple requested aspects (3 aspects)
-comparison detected
-causal reasoning detected
-multi-hop structure detected
-```
-
-2. **Via HyperRAG query metadata**:
-```python
-rag.query("What is diabetes?", param=QueryParam(mode="adaptive"))
+response = rag.query("How does diabetes affect the kidneys?", param=QueryParam(mode="adaptive"))
 decision = rag.last_adaptive_decision
-print(decision.score, decision.mode, decision.reason)
+
+print(f"Initial Mode: {decision.initial_mode}")
+print(f"Complexity Score: {decision.initial_complexity_score}")
+print(f"Retrieval Sufficiency Score: {decision.retrieval_sufficiency_score}")
+print(f"Retrieval Sufficient: {decision.retrieval_sufficient}")
+print(f"Final Mode: {decision.final_mode}")
+print(f"Escalated: {decision.escalated}")
+print(f"Escalation Reason: {decision.escalation_reason}")
+print(f"Metrics: {decision.retrieval_metrics}")
+```
+
+Example Log Output:
+```text
+[Adaptive RAG] Initial complexity score: 38 (threshold: 60) -> Initial mode: LITE
+[Adaptive RAG] Retrieval sufficiency score: 33.0/100 (threshold: 60.0) -> INSUFFICIENT
+[Adaptive RAG] Escalating LITE -> CORE. Reason: Missing relationship evidence for multi-hop / causal query
+[Adaptive RAG] Executing Hyper-Core retrieval...
 ```
 
 ## :memo: License

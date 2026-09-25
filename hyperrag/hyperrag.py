@@ -42,9 +42,22 @@ from .base import (
     BaseHypergraphStorage,
 )
 
-from .operate import hyper_query_stream, hyper_query_lite_stream, naive_query_stream, llm_query_stream
+from .operate import (
+    hyper_query_stream,
+    hyper_query_lite_stream,
+    naive_query_stream,
+    llm_query_stream,
+    hyper_retrieve_lite,
+    hyper_query_lite_reasoning,
+    hyper_query_lite_stream_from_context,
+)
 from .adaptive_router import AdaptiveRouter, AdaptiveDecision
-from my_config import ADAPTIVE_RAG_ENABLED
+from .retrieval_sufficiency import RetrievalSufficiencyEvaluator, RetrievalSufficiency
+from my_config import (
+    ADAPTIVE_RAG_ENABLED,
+    ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED,
+    ADAPTIVE_LOG_DECISIONS,
+)
 
 
 def always_get_an_event_loop() -> asyncio.AbstractEventLoop:
@@ -106,8 +119,9 @@ class HyperRAG:
     addon_params: dict = field(default_factory=dict)
     convert_response_to_json_func: callable = convert_response_to_json
 
-    # adaptive routing
+    # adaptive routing & sufficiency evaluation
     adaptive_router: Optional[Any] = None
+    sufficiency_evaluator: Optional[Any] = None
 
     def __post_init__(self):
         log_file = os.path.join(self.working_dir, "HyperRAG.log")
@@ -116,6 +130,8 @@ class HyperRAG:
 
         if self.adaptive_router is None:
             self.adaptive_router = AdaptiveRouter()
+        if self.sufficiency_evaluator is None:
+            self.sufficiency_evaluator = RetrievalSufficiencyEvaluator()
         self.last_adaptive_decision: Optional[AdaptiveDecision] = None
 
         logger.info(f"Logger initialized for working directory: {self.working_dir}")
@@ -316,7 +332,110 @@ class HyperRAG:
         if decision is not None:
             param.adaptive_decision = decision
 
-        if effective_mode == "hyper":
+        # Adaptive Mode with Retrieval Sufficiency & Escalation
+        if decision is not None and effective_mode == "hyper-lite" and ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED:
+            if self.sufficiency_evaluator is None:
+                self.sufficiency_evaluator = RetrievalSufficiencyEvaluator()
+
+            # Step 1: Perform Lite retrieval only (avoiding LLM reasoning upfront)
+            entity_context, entity_keywords = await hyper_retrieve_lite(
+                query,
+                self.chunk_entity_relation_hypergraph,
+                self.entities_vdb,
+                self.text_chunks,
+                param,
+                asdict(self),
+            )
+
+            # Step 2: Evaluate retrieval sufficiency
+            suff = self.sufficiency_evaluator.evaluate(
+                query,
+                entity_context,
+                features=decision.features,
+                complexity_score=decision.score,
+            )
+            decision.retrieval_sufficiency_score = suff.score
+            decision.retrieval_sufficient = suff.sufficient
+            decision.retrieval_metrics = suff.metrics
+
+            if not suff.sufficient:
+                # Step 3: Escalate Lite -> Core
+                decision.escalated = True
+                decision.final_mode = "core"
+                decision.mode = "core"
+                decision.escalation_reason = (
+                    suff.reasons[0] if suff.reasons else "Insufficient retrieval evidence"
+                )
+
+                if ADAPTIVE_LOG_DECISIONS:
+                    log_msg = (
+                        f"[Adaptive RAG]\n"
+                        f"Retrieval sufficiency score: {suff.score}\n"
+                        f"Status: INSUFFICIENT\n\n"
+                        f"[Adaptive RAG]\n"
+                        f"Escalating LITE -> CORE\n"
+                        f"Reason: {decision.escalation_reason}"
+                    )
+                    logger.info(log_msg)
+                    print(log_msg)
+
+                # Execute Core retrieval and reasoning
+                response = await hyper_query(
+                    query,
+                    self.chunk_entity_relation_hypergraph,
+                    self.entities_vdb,
+                    self.relationships_vdb,
+                    self.text_chunks,
+                    param,
+                    asdict(self),
+                )
+            else:
+                # Lite retrieval is sufficient: run Lite reasoning with already retrieved context
+                decision.final_mode = "lite"
+                decision.escalated = False
+
+                if ADAPTIVE_LOG_DECISIONS:
+                    log_msg = (
+                        f"[Adaptive RAG]\n"
+                        f"Initial mode: LITE\n"
+                        f"Retrieval sufficiency score: {suff.score}\n"
+                        f"Status: SUFFICIENT\n"
+                        f"No escalation required"
+                    )
+                    logger.info(log_msg)
+                    print(log_msg)
+
+                response = await hyper_query_lite_reasoning(
+                    query,
+                    entity_context,
+                    entity_keywords,
+                    param,
+                    asdict(self),
+                )
+
+        elif decision is not None and effective_mode == "hyper":
+            decision.final_mode = "core"
+            decision.escalated = False
+            if ADAPTIVE_LOG_DECISIONS:
+                log_msg = (
+                    "[Adaptive RAG]\n"
+                    "Initial mode: CORE\n"
+                    "Skipping Lite sufficiency check"
+                )
+                logger.info(log_msg)
+                print(log_msg)
+
+            response = await hyper_query(
+                query,
+                self.chunk_entity_relation_hypergraph,
+                self.entities_vdb,
+                self.relationships_vdb,
+                self.text_chunks,
+                param,
+                asdict(self),
+            )
+
+        elif effective_mode == "hyper":
             response = await hyper_query(
                 query,
                 self.chunk_entity_relation_hypergraph,
@@ -386,7 +505,107 @@ class HyperRAG:
         cfg = asdict(self)
         cfg["llm_model_stream_func"] = self.llm_model_stream_func
 
-        if effective_mode == "hyper":
+        if decision is not None and effective_mode == "hyper-lite" and ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED:
+            if self.sufficiency_evaluator is None:
+                self.sufficiency_evaluator = RetrievalSufficiencyEvaluator()
+
+            entity_context, entity_keywords = await hyper_retrieve_lite(
+                query,
+                self.chunk_entity_relation_hypergraph,
+                self.entities_vdb,
+                self.text_chunks,
+                param,
+                cfg,
+            )
+
+            suff = self.sufficiency_evaluator.evaluate(
+                query,
+                entity_context,
+                features=decision.features,
+                complexity_score=decision.score,
+            )
+            decision.retrieval_sufficiency_score = suff.score
+            decision.retrieval_sufficient = suff.sufficient
+            decision.retrieval_metrics = suff.metrics
+
+            if not suff.sufficient:
+                decision.escalated = True
+                decision.final_mode = "core"
+                decision.mode = "core"
+                decision.escalation_reason = (
+                    suff.reasons[0] if suff.reasons else "Insufficient retrieval evidence"
+                )
+
+                if ADAPTIVE_LOG_DECISIONS:
+                    log_msg = (
+                        f"[Adaptive RAG]\n"
+                        f"Retrieval sufficiency score: {suff.score}\n"
+                        f"Status: INSUFFICIENT\n\n"
+                        f"[Adaptive RAG]\n"
+                        f"Escalating LITE -> CORE\n"
+                        f"Reason: {decision.escalation_reason}"
+                    )
+                    logger.info(log_msg)
+                    print(log_msg)
+
+                async for tok in hyper_query_stream(
+                    query,
+                    self.chunk_entity_relation_hypergraph,
+                    self.entities_vdb,
+                    self.relationships_vdb,
+                    self.text_chunks,
+                    param,
+                    cfg,
+                ):
+                    yield tok
+            else:
+                decision.final_mode = "lite"
+                decision.escalated = False
+
+                if ADAPTIVE_LOG_DECISIONS:
+                    log_msg = (
+                        f"[Adaptive RAG]\n"
+                        f"Initial mode: LITE\n"
+                        f"Retrieval sufficiency score: {suff.score}\n"
+                        f"Status: SUFFICIENT\n"
+                        f"No escalation required"
+                    )
+                    logger.info(log_msg)
+                    print(log_msg)
+
+                async for tok in hyper_query_lite_stream_from_context(
+                    query,
+                    entity_context,
+                    entity_keywords,
+                    param,
+                    cfg,
+                ):
+                    yield tok
+
+        elif decision is not None and effective_mode == "hyper":
+            decision.final_mode = "core"
+            decision.escalated = False
+            if ADAPTIVE_LOG_DECISIONS:
+                log_msg = (
+                    "[Adaptive RAG]\n"
+                    "Initial mode: CORE\n"
+                    "Skipping Lite sufficiency check"
+                )
+                logger.info(log_msg)
+                print(log_msg)
+
+            async for tok in hyper_query_stream(
+                query,
+                self.chunk_entity_relation_hypergraph,
+                self.entities_vdb,
+                self.relationships_vdb,
+                self.text_chunks,
+                param,
+                cfg,
+            ):
+                yield tok
+
+        elif effective_mode == "hyper":
             async for tok in hyper_query_stream(
                     query,
                     self.chunk_entity_relation_hypergraph,

@@ -10,6 +10,12 @@ from .adaptive_router import (
     ComplexityScorer,
     BaseComplexityScorer,
 )
+from .retrieval_sufficiency import (
+    RetrievalSufficiencyEvaluator,
+    RetrievalSufficiency,
+    RetrievalMetrics,
+    SufficiencyWeights,
+)
 
 __version__ = "0.0.1"
 
@@ -25,4 +31,8 @@ __all__ = [
     "HeuristicComplexityScorer",
     "ComplexityScorer",
     "BaseComplexityScorer",
+    "RetrievalSufficiencyEvaluator",
+    "RetrievalSufficiency",
+    "RetrievalMetrics",
+    "SufficiencyWeights",
 ]
