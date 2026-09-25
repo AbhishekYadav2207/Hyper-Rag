@@ -1,5 +1,6 @@
 import os
 import asyncio
+from functools import partial
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Type, cast, Optional, Any, Tuple, Dict
