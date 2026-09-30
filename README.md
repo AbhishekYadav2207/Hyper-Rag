@@ -1,724 +1,234 @@
-<!-- <div align="center" id="top"> 
-  <img src="./assets/hg.svg" alt="Hypergraph" width="100%" />
-</div> -->
-
-<h1 align="center">Hyper-RAG</h1>
+<h1 align="center">Hyper-RAG / Adaptive Hyper-RAG</h1>
 
 <p align="center">
   <img alt="Github top language" src="https://img.shields.io/github/languages/top/iMoonLab/Hyper-RAG?color=purple">
-
-  <img alt="Github language count" src="https://img.shields.io/github/languages/count/iMoonLab/Hyper-RAG?color=purple">
-
-  <img alt="Repository size" src="https://img.shields.io/github/repo-size/iMoonLab/Hyper-RAG?color=purple">
-
   <img alt="License" src="https://img.shields.io/github/license/iMoonLab/Hyper-RAG?color=purple">
   <a href="https://www.nature.com/articles/s41467-026-71411-1"><img alt="Nature Communications" src="https://img.shields.io/badge/Nature%20Communications-2026-E63946?logo=nature&logoColor=white"></a>
   <a href="https://doi.org/10.1038/s41467-026-71411-1"><img alt="DOI" src="https://img.shields.io/badge/DOI-10.1038%2Fs41467--026--71411--1-1F6FEB"></a>
 </p>
 
 <p align="center">
-  <a href="#dart-about">About</a> &#xa0; | &#xa0; 
-  <a href="#sparkles-why-hyper-rag-is-more-powerful">Features</a> &#xa0; | &#xa0;
-  <a href="#rocket-installation">Installation</a> &#xa0; | &#xa0;
-  <a href="#white_check_mark-quick-start">Quick Start</a> &#xa0; | &#xa0;
-  <a href="#whale-docker-deployment">Docker</a> &#xa0; | &#xa0;
-  <a href="#checkered_flag-evaluation">Evaluation</a> &#xa0; | &#xa0;
-  <a href="#memo-license">License</a> &#xa0; | &#xa0;
-  <a href="https://github.com/yifanfeng97" target="_blank">Author</a>
+  <a href="#about-the-project">About</a> &nbsp;|&nbsp;
+  <a href="#key-features">Key Features</a> &nbsp;|&nbsp;
+  <a href="#quick-start">Quick Start</a> &nbsp;|&nbsp;
+  <a href="#adaptive-hyper-rag">Adaptive RAG</a> &nbsp;|&nbsp;
+  <a href="#web-console">Web Console</a> &nbsp;|&nbsp;
+  <a href="#documentation-system">Documentation</a> &nbsp;|&nbsp;
+  <a href="#verification-status">Verification</a> &nbsp;|&nbsp;
+  <a href="#citation">Citation</a>
 </p>
 
-<br>
+---
 
+## About the Project
 
-<div align="center">
-  <img src="./assets/many_llms_all.svg" alt="Overall Performance" width="100%" />
-</div>
+**Hyper-RAG** is a state-of-the-art Retrieval-Augmented Generation (RAG) framework developed by [iMoon-Lab](http://moon-lab.tech/), Tsinghua University, and published in *Nature Communications* (2026). 
 
-We show that Hyper-RAG is a powerful RAG that can enhance the performance of various LLMs and outperform other SOTA RAG methods in the NeurologyCorp dataset. **Our paper has been published in <a href="https://www.nature.com/articles/s41467-026-71411-1"><i>Nature Communications</i></a> (2026)**.
+Traditional Graph RAG models relationships strictly as pairwise edges $(u, v)$ between two nodes, causing information loss when modeling complex, multi-entity facts. Hyper-RAG models higher-order multi-entity correlations using **hyperedges** $e = \{v_1, v_2, \dots, v_k\}$ within a native hypergraph database (<a href="https://github.com/iMoonLab/Hypergraph-DB">Hypergraph-DB</a>), drastically reducing Large Language Model hallucinations.
 
-## :dart: About
+**Adaptive Hyper-RAG** introduces an intelligent multi-phase routing and validation engine above the retrieval pipelines, dynamically selecting between **Hyper-Lite** (lightweight entity-passage search) and **Hyper-Core** (full hypergraph diffusion) based on measured query complexity and retrieved evidence.
 
-<details>
-<summary> <b>Abstract</b> </summary>
-Large language models (LLMs) have transformed various sectors, including education, finance, and medicine, by enhancing content generation and decision-making processes. However, their integration into the medical field is cautious due to hallucinations, instances where generated content deviates from factual accuracy, potentially leading to adverse outcomes. To address this, we introduce Hyper-RAG, a hypergraph-driven Retrieval-Augmented Generation method that comprehensively captures both pairwise and beyond-pairwise correlations in domain-specific knowledge, thereby mitigating hallucinations. Experiments on the NeurologyCrop dataset with six prominent LLMs demonstrated that Hyper-RAG improves accuracy by an average of 12.3% over direct LLM use and outperforms Graph RAG and Light RAG by 6.3% and 6.0%, respectively. Additionally, Hyper-RAG maintained stable performance with increasing query complexity, unlike existing methods which declined. Further validation across nine diverse datasets showed a 35.5% performance improvement over Light RAG using a selection-based assessment. The lightweight variant, Hyper-RAG-Lite, achieved twice the retrieval speed and a 3.3\% performance boost compared with Light RAG. These results confirm Hyper-RAG's effectiveness in enhancing LLM reliability and reducing hallucinations, making it a robust solution for high-stakes applications like medical diagnostics.
-</details>
+---
 
-<br>
+## Key Features
 
-<div align="center">
-  <img src="./assets/fw.svg" alt="Framework" width="100%" />
-</div>
-Schematic diagram of the proposed Hyper-RAG architecture. a, The patient poses a question. b, A knowledge base is constructed from relevant domainspecific corpora. c, Responses are generated directly using LLMs. d, Hyper-RAG generates responses by first retrieving relevant prior knowledge from the knowledge base and then inputting this knowledge, along with the patient’s question, into the LLMs to formulate the reply.
+- :heavy_check_mark: **Beyond-Pairwise Hypergraph Modeling**: Connects arbitrary subsets of entities within unified hyperedges, capturing high-order relational knowledge without pairwise decomposition.
+- :heavy_check_mark: **Deterministic Adaptive Routing (Phase 1 & 2.1)**: Evaluates query complexity across 8 categories ($0-100$ score) before retrieval with **0 LLM calls**. Compact, dense queries receive an automatic semantic density bonus.
+- :heavy_check_mark: **Post-Retrieval Sufficiency Escalation (Phase 2)**: Checks retrieved evidence before reasoning. If Lite evidence is deficient, it **automatically escalates to Hyper-Core** with zero wasted LLM tokens.
+- :heavy_check_mark: **Deterministic Response Validation (Phase 3)**: Post-reasoning validator scores generated answers across completeness ($40\%$), evidence support ($40\%$), and relevance ($20\%$).
+- :heavy_check_mark: **Modern Full-Stack Web Console**: Interactive React 18 / Vite 6.4.3 interface featuring Chat, 2D/3D HyperGraph Visualizer, Database Explorer, Document Manager, and OpenAPI Swagger docs.
+- :heavy_check_mark: **Strict Provider Architecture**: Clean separation between **OpenRouter** (LLM reasoning and token streaming) and **Mistral AI** (1024-dimensional dense embeddings).
+- :heavy_check_mark: **Rigorous Test Baseline**: Fully verified against 67 unit tests and 32 automated pipeline checks with **0 warnings and 0 errors**.
 
-<br>
-<br>
+---
 
-<details>
-<summary> <b>More details about hypergraph modeling</b> </summary>
-<div align="center"> 
-  <img src="./assets/hg.svg" alt="Hypergraph" width="100%" />
-Example of hypergraph modeling for entity space. Hypergraph can model the beyond-pairwise relationship among entities, which is more powerful than the pairwise relationship in traditional graph modeling. With hypergraphs, we can avoid the information loss caused by the pairwise relationship.
-</div>
-<br>
-<div align="center"> 
-  <img src="./assets/extract.svg" alt="Extract Hypergraph" width="100%" />
-  Illustration of Entity and Correlation Extraction from Raw Corpus: Dark brown boxes represent entities, blue arrows denote low-order correlations between entities, and red arrows indicate high-order correlations. Yellow boxes contain the original descriptions of the respective entities or their correlations.
-</div>
-</details>
+## Quick Start
 
-<br>
-
-## :sparkles: Why Hyper-RAG is More Powerful
-
-:heavy_check_mark: **Comprehensive Relationship Modeling with Hypergraphs**: Utilizes hypergraphs to thoroughly model the associations within the raw corpus data, providing more complex relationships compared to traditional graph-based data organization.;\
-:heavy_check_mark: **Native Hypergraph-DB Integration**: Employs the native hypergraph database, <a href="https://github.com/iMoonLab/Hypergraph-DB">Hypergraph-DB</a>, as the foundation, supporting rapid retrieval of higher-order associations.;\
-:heavy_check_mark: **Superior Performance**: Hyper-RAG outperforms Graph RAG and Light RAG by 6.3% and 6.0% respectively.;\
-:heavy_check_mark: **Broad Validation**: Across nine diverse datasets, Hyper-RAG shows a 35.5% performance improvement over Light RAG based on a selection-based assessment.;\
-:heavy_check_mark: **Efficiency**: The lightweight variant, Hyper-RAG-Lite, achieves twice the retrieval speed and a 3.3% performance boost compared to Light RAG.;
-
-## :rocket: Installation
-
-
+### 1. Clone & Set Up Python Environment
 ```bash
-# Clone this project
-git clone https://github.com/iMoonLab/Hyper-RAG.git
+git clone https://github.com/AbhishekYadav2207/Hyper-Rag.git
+cd Hyper-Rag
 
-# Access
-cd Hyper-RAG
+# Create and activate virtual environment
+python -m venv venv
+
+# Windows (PowerShell)
+.\venv\Scripts\Activate.ps1
+# Linux / macOS
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+pip install -r web-ui/backend/requirements.txt
 ```
 
-## :white_check_mark: Quick Start
-
-### Configure your LLM API
-Copy the `config_temp.py` file to `my_config.py` in the root folder and set your LLM `URL` and `KEY`.
-
-```python
-# OPENROUTER - ONLY LLM PROVIDER
-OPENROUTER_API_KEYS = "your_openrouter_api_key"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
-
-# MISTRAL - EMBEDDINGS ONLY
-EMB_API_KEYS = "your_mistral_api_key"
-EMB_BASE_URL = "https://api.mistral.ai/v1"
-EMB_MODEL = "mistral-embed"
-EMB_DIM = 1024
-```
-
-### Run the toy example
-
+### 2. Configure Environment (`.env`)
 ```bash
-python examples/hyperrag_demo.py
+# Windows
+Copy-Item .env.example .env
+# Linux / macOS
+cp .env.example .env
+```
+Add your API keys in `.env`:
+```env
+OPENROUTER_API_KEYS=your_openrouter_api_key_here
+EMB_API_KEYS=your_mistral_api_key_here
 ```
 
-### Or Run by Steps
-
-1. Prepare the data. You can download the dataset from Google Drive <a href="https://drive.google.com/drive/folders/1JxXXUR4Jx-2IKn4VGpDeH4xb4-nYEWBx?usp=sharing">here</a>, or Baidu Cloud <a href="https://pan.baidu.com/s/1mrDJVpMW59gLtRRSXafXdw?pwd=w642">here</a>. Put the dataset in the root direction. Then run the following command to preprocess the data.
-
+### 3. Run Fast Local Tests
 ```bash
-python reproduce/Step_0.py
+python -m pytest tests/unit -v
 ```
+*(All 67 unit tests run completely locally with **0 warnings** and require zero API tokens).*
 
-2. Build the knowledge hypergraphs, and entity and relation vector database with following command.
-
+### 4. Launch the Web Console
+In **Terminal 1** (Backend API):
 ```bash
-python reproduce/Step_1.py
+python -m uvicorn web-ui.backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-3. Extract questions from the orignial datasets with following command.
-
+In **Terminal 2** (Frontend Dev Server):
 ```bash
-python reproduce/Step_2_extract_question.py
+cd web-ui/frontend
+npm install
+npm run dev
 ```
 
-Those questions are saved in the `cache/{{data_name}}/questions` folder. 
+Open your browser to: **`http://localhost:5173/`**
 
-4. Run the Hyper-RAG to response those questions with following command.
+> [!TIP]
+> For the complete, beginner-oriented, step-by-step walkthrough, see [**`docs/USER_MANUAL.md`**](file:///d:/Rag/Hyper-RAG/docs/USER_MANUAL.md).
 
-```bash
-python reproduce/Step_3_response_question.py
-```
+---
 
-Those response are saved in the `cache/{{data_name}}/response` folder.
-
-You can also change the `mode` parameter to `hyper` or `hyper-lite` to run the Hyper-RAG or Hyper-RAG-Lite.
-
-
-### Hypergraph Visualization
-We provide a web-based visualization tool for hypergraphs and lightweight Hyper-RAG QA system. For more information, please refer to [Hyper-RAG Web-UI](./web-ui/README.md).
-
-*Note: We welcome any contributions to improve it.*
-![vis-qa](./assets/vis-QA.png)
-![vis-hg](./assets/vis-hg.png)
-
-## 📁 Repository Structure
+## Adaptive Hyper-RAG Overview
 
 ```text
-Hyper-RAG/
-├── hyperrag/                     # Core Hyper-RAG library implementation
-│   ├── adaptive_router.py        # Phase 1: Query complexity analyzer & router
-│   ├── retrieval_sufficiency.py  # Phase 2: Post-retrieval sufficiency evaluator
-│   ├── response_validator.py     # Phase 3: Post-reasoning deterministic response validator
-│   ├── key_pool.py               # API key rotation, cooldown, and backoff engine
-│   ├── llm.py                    # LLM (OpenRouter) & embedding (Mistral) client calls
-│   └── hyperrag.py               # HyperRAG orchestrator & escalation pipeline
-├── datasets/                     # Domain-specific evaluation datasets (local)
-├── docs/                         # Technical documentation & architecture guides
-├── evaluate/                     # Scoring-based and selection-based assessment utilities
-├── examples/                     # Standalone usage demos and mock data
-├── reproduce/                    # Step-by-step benchmark and reproduction scripts
-├── web-ui/                       # Full-stack Web Console (React frontend + FastAPI backend)
-├── assets/                       # Architecture diagrams and benchmark figures
-├── tests/                        # Organized test suite
-│   ├── unit/                     # Maintained unit test suite (isolated, mocked)
-│   │   ├── test_adaptive_router.py
-│   │   ├── test_retrieval_sufficiency.py
-│   │   ├── test_response_validator.py
-│   │   ├── test_key_rotation.py
-│   │   ├── test_language_guard.py
-│   │   └── test_config.py
-│   └── internal/                 # Developer diagnostics (live external provider checks)
-│       ├── test_openrouter.py
-│       └── test_embedding.py
-├── service_api.py                # FastAPI REST and streaming server
-├── testHTML_light.html           # Lightweight browser console for service_api
-├── pilot_benchmark.py            # Pilot benchmark with matrix-backed embedding lookup
-├── run_full_benchmark.py         # Comprehensive 39-query evaluation benchmark suite
-├── benchmark_results.json        # Validated 39-query benchmark results
-├── threshold_analysis.json       # Validated threshold sensitivity analysis (40, 50, 60, 70)
-├── config_temp.py                # Configuration template for local setup
-├── .env.example                  # Environment variable deployment template
-├── pytest.ini                    # Pytest configuration (defaults to tests/unit)
-└── requirements.txt              # Python package dependencies
+User Question
+     │
+     ▼
+[Phase 1 & 2.1] Complexity Analyzer (0–100 Score)
+     │
+     ├─ Score < 60 ──► Hyper-Lite ──► Sufficiency Check ──┬─ Sufficient ──► Lite Answer
+     │                                                    └─ Insufficient ─┐
+     │                                                                     │
+     └─ Score ≥ 60 ──► Hyper-Core (High-Order Hypergraph) ◄────────────────┘
+                             │
+                             ▼
+                         Core Answer
+                             │
+                             ▼
+                [Phase 3] Response Validation
+                             │
+                             ▼
+                     User / API Client
 ```
 
-> **Maintenance Note**: Generated caches (`caches/`), local datasets (`datasets/`), secrets (`.env`, `my_config.py`), temporary benchmark artifacts, and local test outputs are excluded from version control.
+- **Phase 1 (Complexity Scoring)**: Pre-retrieval scoring across 12 signals (comparison, causal, temporal, multi-hop, aggregation, entities).
+- **Phase 2 (Sufficiency Check)**: Post-retrieval evidence evaluation. If score $<60$, triggers early escalation to Hyper-Core before LLM reasoning.
+- **Phase 2.1 (Semantic Density)**: Queries with $\le 7$ words containing comparison/causal signals receive $+15$ bonus to route directly to Core.
+- **Phase 3 (Response Validation)**: Weighted evaluation of Completeness ($0.40$), Evidence Support ($0.40$), and Relevance ($0.20$) against threshold $70.0$.
+- **Boundary**: Evidence-supported $\neq$ globally fact-checked. Phase 4 self-repair is not implemented.
 
-## :whale: Docker Deployment
-
-We provide Docker support for easy deployment of the Hyper-RAG Web UI. Docker deployment includes both frontend and backend services with optional Nginx reverse proxy.
-
-### Quick Start with Docker
-
-1. **Prerequisites**: Ensure Docker and Docker Compose are installed on your system.
-
-2. **Navigate to web-ui directory**:
-```bash
-cd web-ui
-```
-
-3. **Start with Docker Compose**:
-```bash
-docker-compose up 
-```
-
-4. **Access the application**:
-   - Application at http://localhost:5000
-
-### Detailed Documentation
-
-For comprehensive Docker deployment instructions, configuration options, troubleshooting, and production deployment guidelines, please refer to our detailed [Docker Deployment Guide](./web-ui/DOCKER.md).
-
-## :bulb: Simple Test Demo
-
-1. Run by steps
-```bash
-conda activate rag
-cd Hyper_RAG/reproduce
-python reproduce/Step_0.py
-python reproduce/Step_1.py
-
-cd Hyper-RAG
-python -m uvicorn service_api:app --app-dir . --host 0.0.0.0 --port 8000
-```
-2. Open `testHTML_light.html` in your web browser.
-3. Selecting the model (`hyper`,`hyper-lite`,`naive`) and whether to output in streaming mode
-
-<div align="center">
-  <img src="./assets/hyperrag-streaming.gif" alt="Efficiency analysis" width="80%" />
-</div>
-
-## :checkered_flag: Evaluation
-In this work, we propose two evaluation strategys: the **selection-based** and **scoring-based** evaluation. 
-
-### Scoring-based evaluation
-Scoring-Based Assessment is designed to facilitate the comparative evaluation of multiple model outputs by quantifying their performance across various dimensions. This approach allows for a nuanced assessment of model capabilities by providing scores on several key metrics. However, a notable limitation is its reliance on reference answers. In our preprocessing steps, we leverage the source chunks from which each question is derived as reference answers.
-
-You can use the following command to use this evaluation method.
-
-```bash
-python evaluate/evaluate_by_scoring.py
-```
-The results of this evaluation are shown in the following figure.
-<div align="center">
-  <img src="./assets/many_llms_sp.svg" alt="Scoring-based evaluation" width="90%" />
-</div>
-
-
-### Selection-based evaluation
-Selection-Based Assessment is tailored for scenarios where preliminary candidate models are available, enabling a comparative evaluation through a binary choice mechanism. This method does not require reference answers, making it suitable for diverse and open-ended questions. However, its limitation lies in its comparative nature, as it only allows for the evaluation of two models at a time.
-
-You can use the following command to use this evaluation method.
-
-```bash
-python evaluate/evaluate_by_selection.py
-```
-The results of this evaluation are shown in the following figure.
-<div align="center">
-  <img src="./assets/multi_domain.svg" alt="Selection-based evaluation" width="90%" />
-</div>
-
-
-### Efficiency Analysis
-We conducted an efficiency analysis of our Hyper-RAG method using GPT-4o mini on the NeurologyCrop dataset, comparing it with standard RAG, Graph RAG, and Light RAG. To ensure fairness by excluding network latency, we measured only the local retrieval time for relevant knowledge and the construction of the prior knowledge prompt. While standard RAG focuses on the direct retrieval of chunk embeddings, Graph RAG, Light RAG, and Hyper-RAG also include retrieval from node and correlation vector databases and the time for one layer of graph or hypergraph information diffusion. We averaged the response times over 50 questions from the dataset for each method. The results are shown in the following figure.
-
-<div align="center">
-  <img src="./assets/speed_all.svg" alt="Efficiency analysis" width="60%" />
-</div>
-
-## 🔀 Adaptive Hyper-RAG
-
-Adaptive Hyper-RAG is a multi-phase system designed to balance execution cost, latency, and retrieval quality by dynamically selecting between **Hyper-Lite** (lightweight entity-focused retrieval) and **Hyper-Core** (high-order hypergraph structure and reasoning).
-
-```text
-User Query
-    ↓
-[Phase 1] Adaptive Query Router (Deterministic Complexity Scoring)
-    ↓
-Initial Mode Decision: Hyper-Lite OR Hyper-Core
-    ├── If Hyper-Core:
-    │      ↓
-    │   Hyper-Core Retrieval → High-Order Reasoning → Answer
-    │
-    └── If Hyper-Lite:
-           ↓
-        Hyper-Lite Retrieval (Keywords & Entities)
-           ↓
-        [Phase 2] Retrieval Sufficiency Evaluator (Deterministic & Local)
-           ↓
-        Sufficient Evidence?
-            ├── YES (Score >= Threshold):
-            │      ↓
-            │   Hyper-Lite Reasoning → Answer (Remains Lite)
-            │
-            └── NO (Score < Threshold / Weak Evidence):
-                   ↓
-                [Escalation] Escalate to Hyper-Core Retrieval & Reasoning → Answer
-```
+For the in-depth technical specification, see [**`docs/ADAPTIVE_HYPERRAG.md`**](file:///d:/Rag/Hyper-RAG/docs/ADAPTIVE_HYPERRAG.md).
 
 ---
 
-### Phase 1: Deterministic Query Complexity Routing
+## Web Console
 
-#### What Phase 1 is
-The Phase 1 router makes a pre-retrieval decision based entirely on query complexity. It evaluates query characteristics to select an initial execution mode (`lite` or `core`) without any LLM calls.
+The Web Console provides an intuitive graphical interface for all Hyper-RAG capabilities:
+- **Chat (`/#/Chat`)**: Natural language question answering with real-time token streaming and transparent Adaptive decision badges.
+- **Database Explorer (`/#/DB`)**: Tabular browser for vertices (entities) and hyperedges.
+- **Visualization (`/#/Graph`)**: 2D and 3D force-directed canvas with hyperedge convex hulls and entity inspection.
+- **File Ingestion (`/#/Files`)**: Drag-and-drop document upload (`.txt`, `.pdf`, `.docx`, `.md`) with live WebSocket progress.
+- **Swagger Documentation (`/#/API`)**: Interactive OpenAPI specification.
+- **Settings (`/#/Setting`)**: Model provider configuration with automatic API key masking.
 
-#### Why it was added
-- **Query Diversity**: Simple single-entity factual queries often require only low-level entity context (Hyper-Lite), whereas multi-entity, comparative, or multi-hop queries benefit from high-order relationship hyperedges (Hyper-Core).
-- **Zero API Overhead**: Strictly deterministic and rule-driven—it makes **no LLM calls** for routing, avoiding extra latency, API usage, or token costs.
-
-#### Features Considered in Phase 1
-The router evaluates 12 interpretable signals across 8 feature categories:
-1. **Multi-Aspect Questions**: Conjunctions (`and`, `as well as`, `including`), clause enumerations, and comma-separated lists.
-2. **Comparison**: Explicit comparative indicators (`compare`, `versus`, `difference`, `between X and Y`).
-3. **Causal / Explanatory Reasoning**: Triggers requiring relational reasoning (`why`, `how does`, `causes`, `effect`, `mechanism`, `leads to`, `contribute to`).
-4. **Temporal Reasoning**: Chronological references (`over time`, `timeline`, `historically`, `evolution`, year ranges).
-5. **Multi-Hop Reasoning**: Connection pathways (`relationship between`, `how A affects B through C`, `associated with`).
-6. **Aggregation / Synthesis**: Synthesis demands (`summarize all`, `list all`, `across multiple sources`).
-7. **Entity Count**: Lightweight topic/entity extraction detecting quoted terms, proper nouns, and content noun chunks without heavyweight NER dependencies.
-8. **Requested Depth**: Explicit depth markers (`detailed`, `in-depth`, `exhaustive`, `step by step`).
-9. **Structural Complexity**: Word length, sentence count, and question marks.
-
-#### Phase 1 Scoring & Thresholds
-Each detected feature contributes points to a transparent $0$ to $100$ score:
-- **Low Complexity ($0 - 30$)**: Simple factual/definitional queries $\rightarrow$ routes to **Hyper-Lite**.
-- **Medium Complexity ($31 - 60$)**: Moderate queries within Lite capacity $\rightarrow$ routes to **Hyper-Lite** (under default threshold $60$).
-- **High Complexity ($61 - 100$)**: Multi-hop, multi-entity, or comparative queries $\rightarrow$ routes to **Hyper-Core**.
-
-Default threshold:
-```python
-ADAPTIVE_CORE_THRESHOLD = 60  # Score >= 60 executes Hyper-Core; < 60 executes Hyper-Lite
-```
+For view-by-view details, see [**`docs/WEB_UI_GUIDE.md`**](file:///d:/Rag/Hyper-RAG/docs/WEB_UI_GUIDE.md).
 
 ---
 
-### Phase 2: Retrieval Sufficiency & Automatic Lite → Core Escalation
+## REST & Python APIs
 
-#### What Phase 2 is
-While Phase 1 inspects the query *before* retrieval, Phase 2 inspects the actual retrieval artifacts *after* Lite retrieval has run, but *before* generating an LLM response. If Lite retrieval produces empty, duplicate, or insufficient relational evidence for the query's complexity, the system automatically escalates execution to **Hyper-Core**.
-
-#### Why Phase 2 was added
-A query may appear deceptively simple syntactically (e.g. `Score = 35`), but Lite retrieval might only return disconnected fragments, empty results, or lack relationship paths needed to answer the question. Rather than returning an under-informed answer, Phase 2 evaluates retrieval sufficiency and escalates to Core when needed.
-
-#### Retrieval Signals Used in Phase 2
-The `RetrievalSufficiencyEvaluator` evaluates concrete signals extracted from Lite retrieval:
-1. **Item Volume**: Number of retrieved knowledge entities and context items.
-2. **Unique Entities**: Diversity of distinct entities retrieved.
-3. **Context Length**: Total character length of retrieved context chunks.
-4. **Query Entity Coverage**: Lexical and token overlap between query key phrases and retrieved context.
-5. **Duplicate / Redundancy Penalty**: Detection of low-diversity, repetitive context fragments.
-6. **Multi-Hop & Relational Evidence**: For queries requiring causal or multi-hop reasoning, checks whether relational hyperedges or connecting relationships exist. If absent, a significant relational penalty is applied.
-
-#### Transparent Deterministic Formula
-The sufficiency score ($0 - 100$) is computed locally without LLM calls:
-```text
-Score = (Volume_Score * 0.25)
-      + (Unique_Entities_Score * 0.20)
-      + (Context_Length_Score * 0.25)
-      + (Query_Coverage_Score * 0.30)
-      - Missing_Relationship_Penalty (25 pts if multi-hop query lacks hyperedges)
-```
-
-#### Escalation Policy
-- **Core Stays Core**: If Phase 1 selected Core (or mode was forced to Core), Hyper-Lite is never run, and no sufficiency check or downgrade occurs.
-- **Lite Sufficient**: If Lite retrieval score $\ge$ `ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD` (default 60), execution proceeds directly with Lite reasoning.
-- **Lite Insufficient**: If Lite retrieval score $<$ threshold, execution immediately escalates to **Hyper-Core** retrieval and reasoning.
-- **Zero Wasted LLM Generation**: Lite retrieval is decoupled into retrieval and reasoning (`hyper_retrieve_lite` vs `hyper_query_lite_reasoning`). If escalated, Lite reasoning is aborted before calling the LLM, preserving token efficiency and reducing latency.
-- **At Most One Escalation**: Exactly one escalation check occurs per query (Lite $\rightarrow$ Core). No cascading or re-trying loops.
-
----
-
-### Phase 2.1: Short-Query Semantic-Density Refinement
-
-#### Why Phase 2.1 was Introduced
-While Phase 2 successfully rescued queries from Lite to Core through post-retrieval sufficiency checks, the 39-query benchmark identified short queries with dense semantic relationships that received unexpectedly low complexity scores in Phase 1 due to low token/word length. For example, queries like:
-- **Q32**: *"How did greed cause Marley's chains?"* (Score: 47 $\rightarrow$ initial Lite $\rightarrow$ escalated to Core)
-- **Q33**: *"Compare Fred vs Scrooge"* (Score: 51 $\rightarrow$ initial Lite $\rightarrow$ escalated to Core)
-
-Although Phase 2 correctly escalated them, executing Lite retrieval first introduced unnecessary latency and redundant retrieval overhead. Phase 2.1 optimizes the **initial routing decision** so that semantically dense short queries route directly to Core upfront, while keeping short factual queries in Lite.
-
-#### Short-Query Definition & Semantic Activation
-- **Short-Query Boundary**: `word_count <= ADAPTIVE_SHORT_QUERY_MAX_WORDS` (default: **7 words**).
-- **Activation Signals**: High-order semantic signals extracted by `QueryComplexityAnalyzer`:
-  - `comparison` (e.g., *compare*, *vs*, *difference between*)
-  - `causal_reasoning` (e.g., *why*, *how did*, *causes*, *leads to*)
-- **Scoring Bonus**: An explicit, observable bonus of `+15.0` (`ADAPTIVE_SHORT_QUERY_DENSITY_BONUS`).
-- **Complexity Threshold**: `ADAPTIVE_CORE_THRESHOLD = 60` (preserved without artificial threshold lowering).
-
-#### Transparent Score Accounting
-The routing score components are fully observable via `AdaptiveDecision`:
-```text
-Final Score = Base Score + Short-Query Density Bonus
-```
-
-Example Before & After:
-- **Q32 ("How did greed cause Marley's chains?")**:
-  - Base Score: `47`
-  - Short-Query Density Bonus: `+15`
-  - Final Score: `62` (Threshold: `60`) $\rightarrow$ **Core** (Initial Mode: Core; Escalation avoided)
-- **Q33 ("Compare Fred vs Scrooge")**:
-  - Base Score: `51`
-  - Short-Query Density Bonus: `+15`
-  - Final Score: `66` (Threshold: `60`) $\rightarrow$ **Core** (Initial Mode: Core; Escalation avoided)
-
-#### Avoidance of Overcorrection
-Short queries without high-order semantic signals do not activate the bonus and remain Lite:
-- *"What is Scrooge?"* $\rightarrow$ Score: `6` (Lite)
-- *"Who is Marley?"* $\rightarrow$ Score: `6` (Lite)
-- *"What is a counting-house?"* $\rightarrow$ Score: `6` (Lite)
-- *"Who was Tiny Tim?"* $\rightarrow$ Score: `6` (Lite)
-
-#### Unit-Test Verification
-- Dedicated Phase 2.1 test suite in `tests/unit/test_adaptive_router.py` (`TestShortQuerySemanticDensityPhase21`):
-  - **TEST A**: Short factual query (*"What is Scrooge?"*) $\rightarrow$ `is_short_query=True`, `short_query_semantic_density=False`, `score=6`, `mode=lite`.
-  - **TEST B**: Short comparison (*"Compare Fred vs Scrooge"*) $\rightarrow$ `comparison=True`, `short_query_semantic_density=True`, `bonus=+15`, `score=66`, `mode=core`.
-  - **TEST C**: Short causal (*"Why does greed cause suffering?"*) $\rightarrow$ `causal=True`, `bonus=+15`, `score=42`, `mode=lite`.
-  - **TEST D**: Short multi-hop / relationship (*"How does A affect B?"*) $\rightarrow$ `causal=True`, `multi_hop=True`, `score=62`, `mode=core`.
-  - **TEST E**: Long simple query $\rightarrow$ `is_short_query=False`, `bonus=0`, `mode=lite`.
-  - **TEST F**: Additional short factual baseline queries remain Lite without bonus.
-- Overall regression suite: **29/29 tests passed**.
-
-#### Benchmark Measurements (39 Queries)
-| Metric | Before (Phase 2) | After (Phase 2.1) | Impact |
-| :--- | :--- | :--- | :--- |
-| **39-query benchmark size** | 39 | 39 | Exact same dataset |
-| **Initial Lite selections** | 32 | 30 | -2 unnecessary Lite routes |
-| **Initial Core selections** | 7 | 9 | +2 dense queries to Core upfront |
-| **Lite $\rightarrow$ Core escalations** | 5 | 3 | **40% reduction** in escalations |
-| **Final Lite** | 27 | 27 | Preserved |
-| **Final Core** | 12 | 12 | Preserved |
-| **Average Latency** | 134.30 ms | 82.15 ms | **38.8% latency reduction** |
-| **Median Latency** | 96.30 ms | 78.20 ms | Faster median response |
-| **Total LLM Calls** | 83 | 81 | Reduced aborted retrieval overhead |
-| **False-Core Cases** | 0 | 0 | Zero false-Core cases introduced |
-
-#### Final Assessment
-The Phase 2.1 refinement is **retained**: it directly eliminates unnecessary Lite retrieval for dense queries Q32 and Q33, reduces escalations by 40%, and reduces average latency by 38.8% without introducing false-Core errors or requiring LLM calls.
-
----
-
-### Phase 3: Response Validation
-
-#### Purpose & Motivation
-Phase 3 introduces a deterministic validation layer positioned strictly **after** retrieval and reasoning are complete and the final answer is generated. Its sole purpose is to evaluate whether the generated answer:
-1. Actually addresses the user's query;
-2. Covers the requested aspects and entities;
-3. Is relevant and free from off-topic drift;
-4. Is sufficiently supported by retrieved context;
-5. Contains unsupported claims;
-6. Is obviously incomplete, empty, or malformed.
-
-#### Exact Pipeline Architecture
-```text
-                            USER QUERY
-                                |
-                                v
-                    +-------------------------+
-                    | Adaptive Query Router   |
-                    | Phase 1 + Phase 2.1    |
-                    +-----------+-------------+
-                                |
-                    +-----------+-----------+
-                    |                       |
-                  LITE                    CORE
-                    |                       |
-                    v                       v
-             Lite Retrieval          Core Retrieval
-                    |                       |
-                    v                       |
-          Retrieval Sufficiency             |
-             /             \                |
-       sufficient       insufficient        |
-          |                 |               |
-          v                 v               |
-   Lite Reasoning         CORE ------------+
-          |              Reasoning
-          |                 |
-          +--------+--------+
-                   |
-                   v
-              FINAL ANSWER
-                   |
-                   v
-          +--------------------+
-          | Phase 3 Validator  |
-          +--------------------+
-                   |
-                   v
-          Validation Metadata
-```
-
-#### Primary Validation Dimensions (0–100)
-1. **Completeness ($0-100$)**:
-   - Reuses Phase 1 feature extraction (`QueryFeatures`) to extract requested entities, dimensions, comparison pairs, causal relationships, temporal progressions, and multi-hop paths.
-   - Evaluates whether all required aspects are addressed in the generated answer.
-2. **Evidence Support ($0-100$)**:
-   - Divides the answer into claim sentences and checks for ground support in the actual retrieved context (text units, entities, hyperedges).
-   - Identifies unsupported claims (e.g. ungrounded figures, dates, or foreign entities not found in context).
-   - *Important*: "Evidence-supported" means supported by retrieved context; it does **NOT** mean globally fact-checked.
-3. **Relevance ($0-100$)**:
-   - Measures alignment between the answer and user query entities and question intent, penalizing off-topic drift while allowing legitimate explanatory detail.
-
-#### Scoring Formula & Configurable Weights
-$$\text{Overall Score} = (\text{Completeness} \times 0.40) + (\text{Evidence} \times 0.40) + (\text{Relevance} \times 0.20)$$
-Default Threshold: **70.0** / 100
-
-#### Hard Failure Conditions
-Even with a high overall weighted score, an answer is deemed **INVALID** if any critical failure occurs:
-- **Empty Answer**: Answer is `None`, empty string, or whitespace-only (Score: 0).
-- **Substantial Unsupported Content**: Evidence score $< 30$ when substantive claims are made without context support.
-- **Critical Missing Aspects**: Major requested comparison entities, causal relations, or $> 50\%$ of requested aspect list are missing.
-- **Irrelevant Topic Drift**: Relevance score $< 30$.
-
-#### Failure Categories
-Invalid answers are classified using deterministic categories: `EMPTY`, `INCOMPLETE`, `UNSUPPORTED`, `IRRELEVANT`, or `MIXED`.
-
-#### Performance & Invariants
-- **Zero Additional LLM Calls**: Pure local Python execution.
-- **Microsecond Validation Overhead**: Average pure validation latency of $\sim 2.54$ ms.
-- **Answer Preservation**: The generated answer is never altered.
-
-#### Phase 4 Explicit Boundary
-Phase 3 is strictly a validation and diagnostic layer:
-- **Answer Rewriting**: NOT implemented.
-- **Regeneration**: NOT implemented.
-- **Re-retrieval / Repair Loops**: NOT implemented.
-- **Validation-to-Core Escalation**: NOT implemented.
-- **LLM-as-a-Judge**: NOT implemented (0 additional LLM calls introduced).
-The generated answer is returned intact accompanied by structured validation metadata.
-
----
-
-### Configuration
-
-Add to your `.env` or application configuration:
-```bash
-# Adaptive RAG Master Controls
-ADAPTIVE_RAG_ENABLED=true
-ADAPTIVE_RAG_MODE=adaptive
-
-# Phase 1 Complexity Threshold (0-100)
-ADAPTIVE_CORE_THRESHOLD=60
-
-# Phase 2 Sufficiency Threshold (0-100)
-ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED=true
-ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD=60
-
-# Phase 2.1 Short-Query Semantic Density
-ADAPTIVE_SHORT_QUERY_MAX_WORDS=7
-ADAPTIVE_SHORT_QUERY_DENSITY_BONUS=15.0
-
-# Phase 3 Response Validation
-ADAPTIVE_VALIDATION_ENABLED=true
-ADAPTIVE_VALIDATION_THRESHOLD=70
-ADAPTIVE_VALIDATION_LOG_DECISIONS=true
-ADAPTIVE_VALIDATION_COMPLETENESS_WEIGHT=0.40
-ADAPTIVE_VALIDATION_EVIDENCE_WEIGHT=0.40
-ADAPTIVE_VALIDATION_RELEVANCE_WEIGHT=0.20
-
-# Logging
-ADAPTIVE_LOG_DECISIONS=true
-```
-
----
-
-### Usage & Manual Modes
-
-#### Adaptive Execution
+### Python Usage
 ```python
 from hyperrag import HyperRAG, QueryParam
 
 rag = HyperRAG(...)
-# Automatically routes to Lite, checks sufficiency, and escalates to Core if needed:
-response = rag.query("How does diabetes lead to kidney failure?", param=QueryParam(mode="adaptive"))
+# Adaptive mode automatically selects Lite or Core, checking sufficiency:
+answer = rag.query("Compare diabetes and hypertension causes", param=QueryParam(mode="adaptive"))
 ```
 
-#### Direct Manual Overrides
-Manual modes completely bypass the adaptive router and sufficiency escalation:
-```python
-# Force Hyper-Lite (always executes Lite pipeline, no escalation):
-response = rag.query("Compare A and B", param=QueryParam(mode="lite"))
-
-# Force Hyper-Core (always executes Core hypergraph pipeline directly):
-response = rag.query("What is diabetes?", param=QueryParam(mode="core"))
+### Standalone REST API (`service_api.py`)
+```bash
+python -m uvicorn service_api:app --host 0.0.0.0 --port 8002
 ```
 
-#### Inspecting Decisions and Escalation Metadata
-You can inspect the full adaptive decision lifecycle via `rag.last_adaptive_decision`:
-```python
-response = rag.query("How does diabetes affect the kidneys?", param=QueryParam(mode="adaptive"))
-decision = rag.last_adaptive_decision
-
-print(f"Initial Mode: {decision.initial_mode}")
-print(f"Complexity Score: {decision.initial_complexity_score}")
-print(f"Retrieval Sufficiency Score: {decision.retrieval_sufficiency_score}")
-print(f"Retrieval Sufficient: {decision.retrieval_sufficient}")
-print(f"Final Mode: {decision.final_mode}")
-print(f"Escalated: {decision.escalated}")
-print(f"Escalation Reason: {decision.escalation_reason}")
-print(f"Metrics: {decision.retrieval_metrics}")
+Query endpoint:
+```bash
+curl -X POST "http://127.0.0.1:8002/query" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "What is diabetes?", "mode": "adaptive"}'
 ```
 
-#### Inspecting Response Validation Metadata
-You can inspect validation results via `rag.last_validation_result` or via the `validation` key when `return_type="json"`:
-```python
-response = rag.query("How does diabetes affect the kidneys?", param=QueryParam(mode="adaptive"))
-val = rag.last_validation_result
-
-if val:
-    print(f"Validation Score: {val.score}/100 (Valid: {val.valid})")
-    print(f"Completeness: {val.completeness_score}")
-    print(f"Evidence Support: {val.evidence_score}")
-    print(f"Relevance: {val.relevance_score}")
-    if not val.valid:
-        print(f"Missing Aspects: {val.missing_aspects}")
-        print(f"Unsupported Claims: {val.unsupported_claims}")
-        print(f"Reasons: {val.reasons}")
-```
-
-Example Log Output:
-```text
-[Adaptive RAG] Initial complexity score: 38 (threshold: 60) -> Initial mode: LITE
-[Adaptive RAG] Retrieval sufficiency score: 33.0/100 (threshold: 60.0) -> INSUFFICIENT
-[Adaptive RAG] Escalating LITE -> CORE. Reason: Missing relationship evidence for multi-hop / causal query
-[Adaptive RAG] Executing Hyper-Core retrieval...
-[Adaptive Validation]
-Completeness: 92.0
-Evidence: 85.0
-Relevance: 90.0
-Overall: 88.8
-Status: VALID
-```
+For complete schemas and endpoints, see [**`docs/API_REFERENCE.md`**](file:///d:/Rag/Hyper-RAG/docs/API_REFERENCE.md).
 
 ---
 
-### Running Tests
+## Documentation System
 
-The test suite is structured into maintained unit tests (`tests/unit/`) and live developer diagnostics (`tests/internal/`):
+| Document | Description |
+|---|---|
+| [**USER_MANUAL.md**](file:///d:/Rag/Hyper-RAG/docs/USER_MANUAL.md) | **The Master User Guide**: 36-section comprehensive manual and complete runbook. |
+| [**GETTING_STARTED.md**](file:///d:/Rag/Hyper-RAG/docs/GETTING_STARTED.md) | 5-minute quick start for developers. |
+| [**WEB_UI_GUIDE.md**](file:///d:/Rag/Hyper-RAG/docs/WEB_UI_GUIDE.md) | Complete guide to all 6 Web Console views. |
+| [**API_REFERENCE.md**](file:///d:/Rag/Hyper-RAG/docs/API_REFERENCE.md) | Python SDK and FastAPI endpoint reference. |
+| [**ADAPTIVE_HYPERRAG.md**](file:///d:/Rag/Hyper-RAG/docs/ADAPTIVE_HYPERRAG.md) | Technical specification for Phases 1, 2, 2.1, and 3. |
+| [**ARCHITECTURE.md**](file:///d:/Rag/Hyper-RAG/docs/ARCHITECTURE.md) | System architecture and Mermaid sequence flows. |
+| [**CONFIGURATION.md**](file:///d:/Rag/Hyper-RAG/docs/CONFIGURATION.md) | Complete environment variable and `.env` guide. |
+| [**TESTING.md**](file:///d:/Rag/Hyper-RAG/docs/TESTING.md) | Unit tests, internal diagnostics, and benchmark suite. |
+| [**DEVELOPER_GUIDE.md**](file:///d:/Rag/Hyper-RAG/docs/DEVELOPER_GUIDE.md) | Codebase extension points and contributor workflows. |
+| [**TROUBLESHOOTING.md**](file:///d:/Rag/Hyper-RAG/docs/TROUBLESHOOTING.md) | Diagnostic runbook for errors, ports, keys, and rate limits. |
+| [**VERIFICATION_AND_OUTCOMES.md**](file:///d:/Rag/Hyper-RAG/docs/VERIFICATION_AND_OUTCOMES.md) | Empirical test baseline and historical defect fixes. |
+| [**APPENDICES.md**](file:///d:/Rag/Hyper-RAG/docs/APPENDICES.md) | Reference tables, glossary, and FAQ. |
 
-#### 1. Maintained Contributor Suite (Public & Fast)
-Runs all unit and integration tests with pure local mocks, zero external network calls, and zero API quota consumption:
-```bash
-python -m pytest tests/unit
-```
-*(Or simply `pytest`, which automatically defaults to `tests/unit` via `pytest.ini`)*
+---
 
-To run individual test modules:
-```bash
-# Phase 1 & Phase 2.1 Adaptive Router tests
-python -m pytest tests/unit/test_adaptive_router.py
+## Verification Status
 
-# Phase 2 Retrieval Sufficiency & Escalation tests
-python -m pytest tests/unit/test_retrieval_sufficiency.py
+Hyper-RAG is maintained with a strict zero-warning baseline:
+- **Pipeline Automated Checks**: 32 / 32 PASS
+- **Pytest Unit Tests**: 67 / 67 PASS
+- **Web UI Views**: 6 / 6 PASS
+- **FastAPI Endpoints**: 4 / 4 PASS
+- **Benchmark Evaluations**: 2 / 2 PASS
+- **Security & Boundary Checks**: 3 / 3 PASS
+- **Runtime Warnings**: 0
+- **Runtime Errors**: 0
 
-# Phase 3 Response Validation tests
-python -m pytest tests/unit/test_response_validator.py
+For full verification traces and logs, see [**`docs/VERIFICATION_AND_OUTCOMES.md`**](file:///d:/Rag/Hyper-RAG/docs/VERIFICATION_AND_OUTCOMES.md).
 
-# Multi-key rotation & concurrency tests
-python -m pytest tests/unit/test_key_rotation.py
+---
 
-# Configuration & environment variable tests
-python -m pytest tests/unit/test_config.py
+## License
 
-# Language compliance guard tests
-python -m pytest tests/unit/test_language_guard.py
-```
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
-#### 2. Internal Diagnostics (Live Provider Checks)
-Developer diagnostics for manually testing live upstream endpoints (requires valid keys in `.env` and internet connectivity):
-```bash
-# Verify OpenRouter primary LLM endpoint
-python tests/internal/test_openrouter.py
+Hyper-RAG is maintained by [iMoon-Lab](http://moon-lab.tech/), Tsinghua University.
 
-# Verify Mistral embeddings endpoint (1024 dimensions)
-python tests/internal/test_embedding.py
-```
+---
 
-#### 3. Full Pipeline Verification & Test Metrics Distinction
-To prevent confusion between heterogeneous layers, verification reporting strictly separates test metrics:
-- **Pytest Unit Tests (`tests/unit/`)**: 67 isolated, hermetic test cases executing with 0 warnings (`python -m pytest tests/unit -v`).
-- **Automated Pipeline Checks**: 32 system-level verification checks spanning environment configuration, Pydantic V2 modernization, API endpoints, Web UI views, and security filters.
-- **Web UI Views**: 6 interactive views verified (Chat with Adaptive RAG default, DB Explorer, Graph Visualization, File Manager, Swagger API Docs, Settings).
-- **API Endpoints**: 4 core FastAPI endpoints checked (`/`, `/databases`, `/settings`, `/hyperrag/status`).
-- **Verification Run Artifacts**: Verification runs generate structured logs under `logs/full_pipeline_YYYYMMDD_HHMMSS/` containing `SUMMARY.md`, `TEST_MATRIX.md`, `results.json`, `warnings.log`, `errors.log`, and interface screenshots.
+## Citation
 
+If you use Hyper-RAG or Adaptive Hyper-RAG in your research, please cite our *Nature Communications* paper:
 
-## :memo: License
-
-This project is under license from Apache 2.0. For more details, see the [LICENSE](LICENSE) file.
-
-Hyper-RAG is maintained by [iMoon-Lab](http://moon-lab.tech/), Tsinghua University. 
-Made with :heart: by <a href="https://github.com/yifanfeng97" target="_blank">Yifan Feng</a>, <a href="https://github.com/haoohu" target="_blank">Hao Hu</a>, <a href="https://github.com/yifanfeng97" target="_blank">Xingliang Hou</a>, <a href="https://github.com/yifanfeng97" target="_blank">Shiquan Liu</a>, <a href="https://github.com/FuYou0723" target="_blank">Yifan Zhang</a>, <a href="https://github.com/yuxizhe" target="_blank">Xizhe Yu</a>. 
-
-If you have any questions, please feel free to contact us via email: [Yifan Feng](mailto:evanfeng97@gmail.com). 
-
-This repo benefits from [LightRAG](https://github.com/HKUDS/LightRAG) and [Hypergraph-DB](https://github.com/iMoonLab/Hypergraph-DB).  Thanks for their wonderful works.
-
-&#xa0;
-
-## 🌟Citation
-```
+```bibtex
 @article{feng2026hyperrag,
-      title   = {Hyper-RAG: combating LLM hallucinations using hypergraph-driven retrieval-augmented generation},
-      author  = {Feng, Yifan and Hu, Hao and Ying, Shihui and Hou, Xingliang and Liu, Shiquan and Yang, Mingyuan and Li, Junchang and Du, Shaoyi and Zheng, Nanning and Hu, Han and Gao, Yue},
-      journal = {Nature Communications},
-      year    = {2026},
-      doi     = {10.1038/s41467-026-71411-1},
-      url     = {https://www.nature.com/articles/s41467-026-71411-1}
+  title   = {Hyper-RAG: combating LLM hallucinations using hypergraph-driven retrieval-augmented generation},
+  author  = {Feng, Yifan and Hu, Hao and Ying, Shihui and Hou, Xingliang and Liu, Shiquan and Yang, Mingyuan and Li, Junchang and Du, Shaoyi and Zheng, Nanning and Hu, Han and Gao, Yue},
+  journal = {Nature Communications},
+  year    = {2026},
+  doi     = {10.1038/s41467-026-71411-1},
+  url     = {https://www.nature.com/articles/s41467-026-71411-1}
 }
 ```
-
-<a href="#top">Back to top</a>
