@@ -4,6 +4,9 @@ Verification script for Hyper-RAG multi-key provider configuration.
 Verifies all required variables exist without exposing secrets.
 """
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 import my_config
 
 
@@ -45,6 +48,10 @@ def test_configuration():
     assert my_config.ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD == 60, f"ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD expected 60, got {my_config.ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD}"
     assert my_config.ADAPTIVE_SHORT_QUERY_MAX_WORDS == 7, f"ADAPTIVE_SHORT_QUERY_MAX_WORDS expected 7, got {my_config.ADAPTIVE_SHORT_QUERY_MAX_WORDS}"
     assert my_config.ADAPTIVE_SHORT_QUERY_DENSITY_BONUS == 15.0, f"ADAPTIVE_SHORT_QUERY_DENSITY_BONUS expected 15.0, got {my_config.ADAPTIVE_SHORT_QUERY_DENSITY_BONUS}"
+    assert my_config.ADAPTIVE_VALIDATION_THRESHOLD == 70.0, f"ADAPTIVE_VALIDATION_THRESHOLD expected 70.0, got {my_config.ADAPTIVE_VALIDATION_THRESHOLD}"
+    assert my_config.ADAPTIVE_VALIDATION_COMPLETENESS_WEIGHT == 0.40, f"ADAPTIVE_VALIDATION_COMPLETENESS_WEIGHT expected 0.40, got {my_config.ADAPTIVE_VALIDATION_COMPLETENESS_WEIGHT}"
+    assert my_config.ADAPTIVE_VALIDATION_EVIDENCE_WEIGHT == 0.40, f"ADAPTIVE_VALIDATION_EVIDENCE_WEIGHT expected 0.40, got {my_config.ADAPTIVE_VALIDATION_EVIDENCE_WEIGHT}"
+    assert my_config.ADAPTIVE_VALIDATION_RELEVANCE_WEIGHT == 0.20, f"ADAPTIVE_VALIDATION_RELEVANCE_WEIGHT expected 0.20, got {my_config.ADAPTIVE_VALIDATION_RELEVANCE_WEIGHT}"
     print(
         f"  [OK] Adaptive Hyper-RAG: enabled={my_config.ADAPTIVE_RAG_ENABLED}, "
         f"mode={my_config.ADAPTIVE_RAG_MODE}, threshold={my_config.ADAPTIVE_CORE_THRESHOLD}, "
@@ -52,6 +59,8 @@ def test_configuration():
         f"sufficiency_threshold={my_config.ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD}, "
         f"short_query_max_words={my_config.ADAPTIVE_SHORT_QUERY_MAX_WORDS}, "
         f"short_query_density_bonus={my_config.ADAPTIVE_SHORT_QUERY_DENSITY_BONUS}, "
+        f"validation_enabled={my_config.ADAPTIVE_VALIDATION_ENABLED}, "
+        f"validation_threshold={my_config.ADAPTIVE_VALIDATION_THRESHOLD}, "
         f"log_decisions={my_config.ADAPTIVE_LOG_DECISIONS}"
     )
 

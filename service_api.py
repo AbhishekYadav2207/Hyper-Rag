@@ -5,7 +5,7 @@ import sys
 import time
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, Any
 
 import asyncio
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -81,6 +81,7 @@ class QueryResponse(BaseModel):
     mode: str
     latency_ms: int
     adaptive_decision: Optional[Dict[str, Any]] = None
+    validation: Optional[Dict[str, Any]] = None
 
 
 # =============================================================================
@@ -202,11 +203,17 @@ async def query(
         if getattr(rag, "last_adaptive_decision", None)
         else None
     )
+    val_dict = (
+        rag.last_validation_result.to_dict()
+        if getattr(rag, "last_validation_result", None)
+        else None
+    )
     return QueryResponse(
         answer=answer,
         mode=mode,
         latency_ms=latency_ms,
         adaptive_decision=decision_dict,
+        validation=val_dict,
     )
 
 

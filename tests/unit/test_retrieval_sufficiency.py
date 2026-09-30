@@ -5,6 +5,8 @@ Testing Step 13 (Tests 1 to 10) & Step 14 (Performance Comparison on controlled 
 """
 
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import time
 import unittest
 from unittest.mock import AsyncMock, patch, MagicMock

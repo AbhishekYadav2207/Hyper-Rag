@@ -1147,6 +1147,10 @@ async def hyper_query(
         "text_units": deduplicate_by_key(ent_ctx.get("text_units", []) + rel_ctx.get("text_units", []), "content")
     }
 
+    if query_param is not None:
+        query_param.last_context = context
+        query_param.last_context_json = contextJson
+
     if query_param.only_need_context:
         return context
     if context is None:
@@ -1261,13 +1265,19 @@ async def hyper_query_stream(
         combine the information from the local_query and global_query,
         so that we can have the final retrieval information.
     """
-    context = combine_contexts(relation_context.get("context"), entity_context.get("context"))
+    rel_ctx = relation_context if relation_context is not None else {}
+    ent_ctx = entity_context if entity_context is not None else {}
+    context = combine_contexts(rel_ctx.get("context"), ent_ctx.get("context"))
 
     contextJson = {
-        "entities": deduplicate_by_key(entity_context.get("entities", []) + relation_context.get("entities", []), "entity_name"),
-        "hyperedges": deduplicate_by_key(entity_context.get("hyperedges", []) + relation_context.get("hyperedges", []), "entity_set"),
-        "text_units": deduplicate_by_key(entity_context.get("text_units", []) + relation_context.get("text_units", []), "content")
+        "entities": deduplicate_by_key(ent_ctx.get("entities", []) + rel_ctx.get("entities", []), "entity_name"),
+        "hyperedges": deduplicate_by_key(ent_ctx.get("hyperedges", []) + rel_ctx.get("hyperedges", []), "entity_set"),
+        "text_units": deduplicate_by_key(ent_ctx.get("text_units", []) + rel_ctx.get("text_units", []), "content")
     }
+
+    if query_param is not None:
+        query_param.last_context = context
+        query_param.last_context_json = contextJson
 
     if query_param.only_need_context:
         yield context or ""
@@ -1368,6 +1378,9 @@ async def hyper_query_lite_reasoning(
     """
     use_model_func = global_config["llm_model_func"]
     context = entity_context.get("context") if entity_context else None
+    if query_param is not None:
+        query_param.last_context = context
+        query_param.last_context_json = entity_context
 
     if query_param.only_need_context:
         return context or ""
@@ -1835,6 +1848,9 @@ async def hyper_query_lite_stream_from_context(
         raise AttributeError("llm_model_stream_func not found; streaming is unavailable.")
 
     context = entity_context.get("context") if entity_context else None
+    if query_param is not None:
+        query_param.last_context = context
+        query_param.last_context_json = entity_context
 
     if query_param.only_need_context:
         yield context or ""

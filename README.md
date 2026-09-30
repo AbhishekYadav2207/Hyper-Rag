@@ -161,6 +161,7 @@ Hyper-RAG/
 ├── hyperrag/                     # Core Hyper-RAG library implementation
 │   ├── adaptive_router.py        # Phase 1: Query complexity analyzer & router
 │   ├── retrieval_sufficiency.py  # Phase 2: Post-retrieval sufficiency evaluator
+│   ├── response_validator.py     # Phase 3: Post-reasoning deterministic response validator
 │   ├── key_pool.py               # API key rotation, cooldown, and backoff engine
 │   ├── llm.py                    # LLM (OpenRouter) & embedding (Mistral) client calls
 │   └── hyperrag.py               # HyperRAG orchestrator & escalation pipeline
@@ -171,10 +172,16 @@ Hyper-RAG/
 ├── reproduce/                    # Step-by-step benchmark and reproduction scripts
 ├── web-ui/                       # Full-stack Web Console (React frontend + FastAPI backend)
 ├── assets/                       # Architecture diagrams and benchmark figures
-├── test_adaptive_router.py       # Unit tests for Phase 1 & Phase 2.1 query routing
-├── test_retrieval_sufficiency.py # Unit tests for Phase 2 sufficiency evaluation
-├── test_key_rotation.py          # Unit tests for multi-key pool rotation & backoff
-├── test_config.py                # Unit tests for configuration validation
+├── tests/                        # Organized test suite
+│   ├── unit/                     # Maintained unit test suite (isolated, mocked)
+│   │   ├── test_adaptive_router.py
+│   │   ├── test_retrieval_sufficiency.py
+│   │   ├── test_response_validator.py
+│   │   ├── test_key_rotation.py
+│   │   └── test_config.py
+│   └── internal/                 # Developer diagnostics (live external provider checks)
+│       ├── test_openrouter.py
+│       └── test_embedding.py
 ├── service_api.py                # FastAPI REST and streaming server
 ├── testHTML_light.html           # Lightweight browser console for service_api
 ├── pilot_benchmark.py            # Pilot benchmark with matrix-backed embedding lookup
@@ -183,6 +190,7 @@ Hyper-RAG/
 ├── threshold_analysis.json       # Validated threshold sensitivity analysis (40, 50, 60, 70)
 ├── config_temp.py                # Configuration template for local setup
 ├── .env.example                  # Environment variable deployment template
+├── pytest.ini                    # Pytest configuration (defaults to tests/unit)
 └── requirements.txt              # Python package dependencies
 ```
 
@@ -413,7 +421,7 @@ Short queries without high-order semantic signals do not activate the bonus and 
 - *"Who was Tiny Tim?"* $\rightarrow$ Score: `6` (Lite)
 
 #### Unit-Test Verification
-- Dedicated Phase 2.1 test suite in `test_adaptive_router.py` (`TestShortQuerySemanticDensityPhase21`):
+- Dedicated Phase 2.1 test suite in `tests/unit/test_adaptive_router.py` (`TestShortQuerySemanticDensityPhase21`):
   - **TEST A**: Short factual query (*"What is Scrooge?"*) $\rightarrow$ `is_short_query=True`, `short_query_semantic_density=False`, `score=6`, `mode=lite`.
   - **TEST B**: Short comparison (*"Compare Fred vs Scrooge"*) $\rightarrow$ `comparison=True`, `short_query_semantic_density=True`, `bonus=+15`, `score=66`, `mode=core`.
   - **TEST C**: Short causal (*"Why does greed cause suffering?"*) $\rightarrow$ `causal=True`, `bonus=+15`, `score=42`, `mode=lite`.
@@ -441,6 +449,98 @@ The Phase 2.1 refinement is **retained**: it directly eliminates unnecessary Lit
 
 ---
 
+### Phase 3: Response Validation
+
+#### Purpose & Motivation
+Phase 3 introduces a deterministic validation layer positioned strictly **after** retrieval and reasoning are complete and the final answer is generated. Its sole purpose is to evaluate whether the generated answer:
+1. Actually addresses the user's query;
+2. Covers the requested aspects and entities;
+3. Is relevant and free from off-topic drift;
+4. Is sufficiently supported by retrieved context;
+5. Contains unsupported claims;
+6. Is obviously incomplete, empty, or malformed.
+
+#### Exact Pipeline Architecture
+```text
+                            USER QUERY
+                                |
+                                v
+                    +-------------------------+
+                    | Adaptive Query Router   |
+                    | Phase 1 + Phase 2.1    |
+                    +-----------+-------------+
+                                |
+                    +-----------+-----------+
+                    |                       |
+                  LITE                    CORE
+                    |                       |
+                    v                       v
+             Lite Retrieval          Core Retrieval
+                    |                       |
+                    v                       |
+          Retrieval Sufficiency             |
+             /             \                |
+       sufficient       insufficient        |
+          |                 |               |
+          v                 v               |
+   Lite Reasoning         CORE ------------+
+          |              Reasoning
+          |                 |
+          +--------+--------+
+                   |
+                   v
+              FINAL ANSWER
+                   |
+                   v
+          +--------------------+
+          | Phase 3 Validator  |
+          +--------------------+
+                   |
+                   v
+          Validation Metadata
+```
+
+#### Primary Validation Dimensions (0–100)
+1. **Completeness ($0-100$)**:
+   - Reuses Phase 1 feature extraction (`QueryFeatures`) to extract requested entities, dimensions, comparison pairs, causal relationships, temporal progressions, and multi-hop paths.
+   - Evaluates whether all required aspects are addressed in the generated answer.
+2. **Evidence Support ($0-100$)**:
+   - Divides the answer into claim sentences and checks for ground support in the actual retrieved context (text units, entities, hyperedges).
+   - Identifies unsupported claims (e.g. ungrounded figures, dates, or foreign entities not found in context).
+   - *Important*: "Evidence-supported" means supported by retrieved context; it does **NOT** mean globally fact-checked.
+3. **Relevance ($0-100$)**:
+   - Measures alignment between the answer and user query entities and question intent, penalizing off-topic drift while allowing legitimate explanatory detail.
+
+#### Scoring Formula & Configurable Weights
+$$\text{Overall Score} = (\text{Completeness} \times 0.40) + (\text{Evidence} \times 0.40) + (\text{Relevance} \times 0.20)$$
+Default Threshold: **70.0** / 100
+
+#### Hard Failure Conditions
+Even with a high overall weighted score, an answer is deemed **INVALID** if any critical failure occurs:
+- **Empty Answer**: Answer is `None`, empty string, or whitespace-only (Score: 0).
+- **Substantial Unsupported Content**: Evidence score $< 30$ when substantive claims are made without context support.
+- **Critical Missing Aspects**: Major requested comparison entities, causal relations, or $> 50\%$ of requested aspect list are missing.
+- **Irrelevant Topic Drift**: Relevance score $< 30$.
+
+#### Failure Categories
+Invalid answers are classified using deterministic categories: `EMPTY`, `INCOMPLETE`, `UNSUPPORTED`, `IRRELEVANT`, or `MIXED`.
+
+#### Performance & Invariants
+- **Zero Additional LLM Calls**: Pure local Python execution.
+- **Microsecond Validation Overhead**: Average pure validation latency of $\sim 2.54$ ms.
+- **Answer Preservation**: The generated answer is never altered.
+
+#### Phase 4 Explicit Boundary
+Phase 3 is strictly a validation and diagnostic layer:
+- **Answer Rewriting**: NOT implemented.
+- **Regeneration**: NOT implemented.
+- **Re-retrieval / Repair Loops**: NOT implemented.
+- **Validation-to-Core Escalation**: NOT implemented.
+- **LLM-as-a-Judge**: NOT implemented (0 additional LLM calls introduced).
+The generated answer is returned intact accompanied by structured validation metadata.
+
+---
+
 ### Configuration
 
 Add to your `.env` or application configuration:
@@ -459,6 +559,14 @@ ADAPTIVE_RETRIEVAL_SUFFICIENCY_THRESHOLD=60
 # Phase 2.1 Short-Query Semantic Density
 ADAPTIVE_SHORT_QUERY_MAX_WORDS=7
 ADAPTIVE_SHORT_QUERY_DENSITY_BONUS=15.0
+
+# Phase 3 Response Validation
+ADAPTIVE_VALIDATION_ENABLED=true
+ADAPTIVE_VALIDATION_THRESHOLD=70
+ADAPTIVE_VALIDATION_LOG_DECISIONS=true
+ADAPTIVE_VALIDATION_COMPLETENESS_WEIGHT=0.40
+ADAPTIVE_VALIDATION_EVIDENCE_WEIGHT=0.40
+ADAPTIVE_VALIDATION_RELEVANCE_WEIGHT=0.20
 
 # Logging
 ADAPTIVE_LOG_DECISIONS=true
@@ -503,12 +611,76 @@ print(f"Escalation Reason: {decision.escalation_reason}")
 print(f"Metrics: {decision.retrieval_metrics}")
 ```
 
+#### Inspecting Response Validation Metadata
+You can inspect validation results via `rag.last_validation_result` or via the `validation` key when `return_type="json"`:
+```python
+response = rag.query("How does diabetes affect the kidneys?", param=QueryParam(mode="adaptive"))
+val = rag.last_validation_result
+
+if val:
+    print(f"Validation Score: {val.score}/100 (Valid: {val.valid})")
+    print(f"Completeness: {val.completeness_score}")
+    print(f"Evidence Support: {val.evidence_score}")
+    print(f"Relevance: {val.relevance_score}")
+    if not val.valid:
+        print(f"Missing Aspects: {val.missing_aspects}")
+        print(f"Unsupported Claims: {val.unsupported_claims}")
+        print(f"Reasons: {val.reasons}")
+```
+
 Example Log Output:
 ```text
 [Adaptive RAG] Initial complexity score: 38 (threshold: 60) -> Initial mode: LITE
 [Adaptive RAG] Retrieval sufficiency score: 33.0/100 (threshold: 60.0) -> INSUFFICIENT
 [Adaptive RAG] Escalating LITE -> CORE. Reason: Missing relationship evidence for multi-hop / causal query
 [Adaptive RAG] Executing Hyper-Core retrieval...
+[Adaptive Validation]
+Completeness: 92.0
+Evidence: 85.0
+Relevance: 90.0
+Overall: 88.8
+Status: VALID
+```
+
+---
+
+### Running Tests
+
+The test suite is structured into maintained unit tests (`tests/unit/`) and live developer diagnostics (`tests/internal/`):
+
+#### 1. Maintained Contributor Suite (Public & Fast)
+Runs all unit and integration tests with pure local mocks, zero external network calls, and zero API quota consumption:
+```bash
+python -m pytest tests/unit
+```
+*(Or simply `pytest`, which automatically defaults to `tests/unit` via `pytest.ini`)*
+
+To run individual test modules:
+```bash
+# Phase 1 & Phase 2.1 Adaptive Router tests
+python -m pytest tests/unit/test_adaptive_router.py
+
+# Phase 2 Retrieval Sufficiency & Escalation tests
+python -m pytest tests/unit/test_retrieval_sufficiency.py
+
+# Phase 3 Response Validation tests
+python -m pytest tests/unit/test_response_validator.py
+
+# Multi-key rotation & concurrency tests
+python -m pytest tests/unit/test_key_rotation.py
+
+# Configuration & environment variable tests
+python -m pytest tests/unit/test_config.py
+```
+
+#### 2. Internal Diagnostics (Live Provider Checks)
+Developer diagnostics for manually testing live upstream endpoints (requires valid keys in `.env` and internet connectivity):
+```bash
+# Verify OpenRouter primary LLM endpoint
+python tests/internal/test_openrouter.py
+
+# Verify Mistral embeddings endpoint (1024 dimensions)
+python tests/internal/test_embedding.py
 ```
 
 ## :memo: License

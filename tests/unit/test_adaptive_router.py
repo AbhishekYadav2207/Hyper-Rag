@@ -5,6 +5,8 @@ Covering STEP 13 (Tests 1 to 12) & STEP 14 (Evaluation Output)
 """
 
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import unittest
 from unittest.mock import MagicMock
 

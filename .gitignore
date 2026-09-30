@@ -186,11 +186,8 @@ web-ui/backend/hyperrag_cache/
 web-ui/backend/uploads/
 web-ui/backend/files.db
 
-# Local test scripts
+# Local test caches & scratch
 test_cache/
-/test_*.py
-
-/test_key_rotation.py
-reproduce/Step_nvidia_test.py
-reproduce/Step_extraction_debug.py
-reproduce/Step_reasoning_test.py
+/scratch/
+*validation*.log
+*validation_benchmark*.json

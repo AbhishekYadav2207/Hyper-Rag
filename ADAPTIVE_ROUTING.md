@@ -103,10 +103,11 @@ Hyper-Lite                 Hyper-Core
 | `.env.example` | Environment Variables | Documents default variables, recommended thresholds, and logging toggles for deployments. |
 | `config_temp.py` | Configuration Template | Provides configuration support and fallback definitions. |
 | `service_api.py` | FastAPI Service Layer | Validates incoming modes (`adaptive`, `core`, `lite`, etc.) and returns structured `adaptive_decision` metadata in `QueryResponse`. |
-| `test_adaptive_router.py` | Test Suite | Isolated unit tests validating Phase 1 & 2.1 complexity dimensions, boundary conditions, and short-query semantic density. |
-| `test_retrieval_sufficiency.py` | Test Suite | Isolated unit tests validating Phase 2 retrieval sufficiency evaluation, scoring formulas, and escalation policies. |
-| `test_key_rotation.py` | Test Suite | Isolated unit tests validating multi-key pool rotation, 429 backoff, 401 handling, embedding isolation, and concurrency. |
-| `test_config.py` | Test Suite | Validates configuration loading, environment parsing, and key initialization. |
+| `tests/unit/test_adaptive_router.py` | Test Suite | Isolated unit tests validating Phase 1 & 2.1 complexity dimensions, boundary conditions, and short-query semantic density. |
+| `tests/unit/test_retrieval_sufficiency.py` | Test Suite | Isolated unit tests validating Phase 2 retrieval sufficiency evaluation, scoring formulas, and escalation policies. |
+| `tests/unit/test_response_validator.py` | Test Suite | Isolated unit tests validating Phase 3 response validation, aspect coverage, and evidence alignment. |
+| `tests/unit/test_key_rotation.py` | Test Suite | Isolated unit tests validating multi-key pool rotation, 429 backoff, 401 handling, embedding isolation, and concurrency. |
+| `tests/unit/test_config.py` | Test Suite | Validates configuration loading, environment parsing, and key initialization. |
 | `README.md` | User-Facing Documentation | Provides setup instructions, architecture descriptions, and user guidance for adaptive routing. |
 
 ---
@@ -405,7 +406,7 @@ decision = rag.last_adaptive_decision
 
 ## 11. Test Results
 
-The deterministic router has been verified using the isolated test suite in `test_adaptive_router.py`:
+The deterministic router has been verified using the isolated test suite in `tests/unit/test_adaptive_router.py`:
 
 | Test Query | Complexity Score | Selected Mode | Evaluated Traits |
 | :--- | :---: | :---: | :--- |
@@ -448,31 +449,45 @@ The Phase 1 routing implementation strictly adheres to the following system inva
 
 ---
 
-## 14. Future Roadmap
+## 14. Architecture Evolution & Roadmap
 
 The Adaptive Hyper-RAG roadmap consists of the following distinct phases:
 
-### Phase 2: Retrieval Sufficiency & Lite $\rightarrow$ Core Escalation
+### Phase 1: Deterministic Query Complexity Routing (Completed)
+- Pre-retrieval query complexity analysis and Lite vs. Core selection.
+- Zero LLM calls; pure local heuristics.
+
+### Phase 2: Retrieval Sufficiency & Lite $\rightarrow$ Core Escalation (Completed)
 - Post-retrieval inspection of retrieved contexts (item count, context length, entity coverage).
-- Automatic escalation from Hyper-Lite to Hyper-Core if retrieved evidence is insufficient or empty.
+- Automatic escalation from Hyper-Lite to Hyper-Core when retrieved evidence is deficient.
 
-### Phase 3: Answer Validation
-- Quality and completeness checking of the synthesized response.
-- Hallucination detection and citation verification.
+### Phase 2.1: Short-Query Semantic-Density Refinement (Completed)
+- Semantic density bonus for compact, high-concept queries.
+- Direct routing to Core for short dense comparisons/causal inquiries.
 
-### Phase 4: Self-Repair & Iterative Querying
-- Re-querying and context replenishment for unfulfilled aspects.
-- Feedback loops for answer refinement.
+### Phase 3: Response Validation (Completed)
+- Post-reasoning deterministic evaluation of generated answers.
+- 3 dimensions: Completeness ($0-100$), Evidence Support ($0-100$), and Relevance ($0-100$).
+- Scoring: $(\text{Completeness} \times 0.40) + (\text{Evidence} \times 0.40) + (\text{Relevance} \times 0.20)$ with threshold $70.0$.
+- Hard-failure rules for empty answers, critical missing aspects, low evidence ($<30$), or topic drift ($<30$).
+- **Zero additional LLM calls**; microsecond overhead ($\sim 2.54$ ms).
 
-*(Note: Phases 2, 3, and 4 represent future architecture and are not part of the Phase 1 routing layer).*
+### Phase 4: Self-Repair & Iterative Querying (Future / NOT Implemented)
+- Feedback-driven re-retrieval and re-reasoning.
+- Automatic answer rewriting or regeneration.
+*(Note: Phase 4 self-repair is strictly outside Phase 3 scope and is NOT implemented).*
 
 ---
 
 ## 15. Documentation Quality & Maintainer Guidance
 
 - **Code Symbol Alignment**: All class, method, and variable names in this document match the codebase implementation.
-- **Reproducibility**: Router behavior can be verified at any time by running:
+- **Reproducibility**: Router behavior and the full suite can be verified at any time by running:
   ```bash
-  python test_adaptive_router.py
+  # Run dedicated router test suite
+  python -m pytest tests/unit/test_adaptive_router.py
+
+  # Run full maintained unit test suite
+  python -m pytest tests/unit
   ```
 - **Extensibility**: Custom feature extractors or scoring formulas can be added by implementing subclasses of `BaseComplexityScorer` in `hyperrag/adaptive_router.py`.

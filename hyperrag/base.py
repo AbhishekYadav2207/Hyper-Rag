@@ -30,6 +30,11 @@ class QueryParam:
     return_type: Literal["json", "text"] = "text"
     # Adaptive routing decision record (populated when mode is adaptive)
     adaptive_decision: Optional[Any] = None
+    # Phase 3: Response validation result record
+    validation_result: Optional[Any] = None
+    # Track last retrieved context for downstream validation
+    last_context: Optional[Any] = None
+    last_context_json: Optional[Any] = None
 
 
 @dataclass

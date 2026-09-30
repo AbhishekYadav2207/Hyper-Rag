@@ -9,27 +9,33 @@ Adaptive Hyper-RAG is a two-phase dynamic routing and escalation engine designed
 ```text
 User Query
     ↓
-[Phase 1] Adaptive Query Router (Deterministic Pre-Retrieval Complexity Scoring)
+[Phase 1 + 2.1] Adaptive Query Router (Deterministic Complexity Scoring & Semantic Density)
     ↓
 Initial Mode Decision: Hyper-Lite OR Hyper-Core
     ├── If Hyper-Core:
     │      ↓
-    │   Hyper-Core Retrieval → High-Order Reasoning → Answer
+    │   Hyper-Core Retrieval → High-Order Reasoning
     │
     └── If Hyper-Lite:
            ↓
         Hyper-Lite Retrieval (Keywords & Entities)
            ↓
-        [Phase 2] Retrieval Sufficiency Evaluator (Deterministic Post-Retrieval Scoring)
+        [Phase 2] Retrieval Sufficiency Evaluator (Deterministic Evidence Scoring)
            ↓
         Sufficient Evidence?
             ├── YES (Score >= Threshold):
             │      ↓
-            │   Hyper-Lite Reasoning → Answer (Remains Lite)
+            │   Hyper-Lite Reasoning (Remains Lite)
             │
             └── NO (Score < Threshold / Weak Evidence):
                    ↓
-                [Escalation] Escalate to Hyper-Core Retrieval & Reasoning → Answer
+                [Escalation] Hyper-Core Retrieval & Reasoning
+    ↓
+FINAL ANSWER
+    ↓
+[Phase 3] Response Validator (Deterministic In-Process Evaluation: 0 LLM Calls)
+    ↓
+Validated Answer + Validation Metadata
 ```
 
 ---
@@ -259,3 +265,116 @@ Initial complexity score: 86 (threshold: 60) -> Initial mode: CORE
 Initial mode: CORE
 Skipping Lite sufficiency check
 ```
+
+---
+
+## 7. Phase 3: Response Validation
+
+### Motivation & Purpose
+Validation operates strictly **downstream** of final answer synthesis. It examines the generated answer in relation to the user query and the retrieved context to verify that:
+1. All requested query entities, dimensions, and relational questions are addressed;
+2. Major answer claims are grounded in retrieved evidence;
+3. Topic drift or hallucination away from the query intent is identified;
+4. Unsupported claims are isolated and flagged without altering the answer.
+
+### Pipeline Location
+```text
+Final Answer (from Lite or Core reasoning)
+    ↓
+DeterministicResponseValidator.validate(query, answer, context, adaptive_decision)
+    ↓
+ValidationResult attached to QueryParam and API response
+```
+
+### The Three Core Dimensions (0–100)
+
+#### 1. Completeness Analysis
+- **Aspect & Entity Extraction**: Reuses `QueryFeatures` from Phase 1 (`comparison`, `causal_reasoning`, `temporal_reasoning`, `multi_hop`, `aggregation`, `detected_entities`, `aspect_count`).
+- **Comparison Validation**: Verifies both compared entities are discussed, along with requested dimensions and comparative connective terminology.
+- **Causal Validation**: Distinguishes mere entity presence from explanatory causal relationship structures.
+- **Temporal Progression**: Confers completeness for chronological progression over time, penalizing single-point answers for multi-period questions.
+- **Multi-Hop Traversal**: Verifies intermediate nodes and relationship pathways.
+- **Aggregation**: Flags potential incompleteness relative to retrieved evidence if comprehensive enumeration was requested.
+
+#### 2. Evidence Support Analysis
+- **Claim-Level Grounding**: Segment answers into discrete assertions.
+- **Local Context Comparison**: Checks entity overlap, keyword presence, and n-gram overlap against retrieved context (`text_units`, `entities`, `hyperedges`).
+- **Unsupported Claims**: Detects foreign entities, ungrounded dates, or ungrounded statistics not present in the context.
+- *CRITICAL INVARIANT*: **Evidence-supported does NOT mean globally fact-checked.** The validator only checks alignment against locally retrieved context.
+
+#### 3. Relevance Analysis
+- Measures overlap and topic alignment between user query terms and the answer, penalizing off-topic tangents while permitting legitimate explanatory detail.
+
+### Scoring Formula & Configurable Weights
+$$\text{Overall Score} = (\text{Completeness} \times 0.40) + (\text{Evidence} \times 0.40) + (\text{Relevance} \times 0.20)$$
+
+- Default Threshold: **70.0**
+- Hard Failure Rules:
+  - Empty or whitespace answer: $\text{Score} = 0$, `valid = False`.
+  - Substantial unsupported assertions: $\text{Evidence} < 30 \implies \text{valid} = \text{False}$.
+  - Major missing aspects / comparison entities: $\text{valid} = \text{False}$.
+  - Irrelevant topic drift: $\text{Relevance} < 30 \implies \text{valid} = \text{False}$.
+
+### Result Schema (`ValidationResult`)
+```python
+ValidationResult(
+    valid=True,
+    score=88.0,
+    completeness_score=94.0,
+    evidence_score=84.0,
+    relevance_score=90.0,
+    missing_aspects=[],
+    unsupported_claims=[],
+    reasons=["All requested aspects addressed", "Major claims supported by retrieved evidence"],
+    metrics={"claim_count": 3, "supported_claims": 3, "context_length": 1420}
+)
+```
+
+### Configuration Parameters
+```env
+ADAPTIVE_VALIDATION_ENABLED=true
+ADAPTIVE_VALIDATION_THRESHOLD=70
+ADAPTIVE_VALIDATION_LOG_DECISIONS=true
+ADAPTIVE_VALIDATION_COMPLETENESS_WEIGHT=0.40
+ADAPTIVE_VALIDATION_EVIDENCE_WEIGHT=0.40
+ADAPTIVE_VALIDATION_RELEVANCE_WEIGHT=0.20
+```
+
+### Phase 4 Explicit Boundary
+Phase 3 is strictly validation and diagnostics. The following are **NOT** implemented:
+- Automatic answer rewriting
+- Automatic regeneration
+- Re-retrieval loops
+- Validation-to-Core escalation
+- LLM-as-a-judge (0 additional LLM calls)
+The generated response remains completely untouched.
+
+---
+
+## 8. Test Architecture & Execution
+
+The test suite enforces full regression testing across all phases:
+
+### Directory Structure
+
+- `tests/unit/`: Fast, hermetic, mocked unit tests testing components in isolation:
+  - `test_adaptive_router.py`: Tests Phase 1 query complexity scoring, classification, and Phase 2.1 short query density bonuses.
+  - `test_retrieval_sufficiency.py`: Tests Phase 2 retrieval sufficiency evaluation and Lite $\rightarrow$ Core escalation logic.
+  - `test_response_validator.py`: Tests Phase 3 response validation across completeness, evidence support, relevance, unsupported claim detection, and failure modes.
+  - `test_key_rotation.py`: Tests multi-key pool rotation, 429 backoff, 401 handling, and concurrency safety.
+  - `test_config.py`: Tests environment variable parsing and configuration invariants.
+- `tests/internal/`: Live diagnostic scripts verifying external upstream providers (OpenRouter LLM and Mistral embeddings).
+
+### Running Tests
+
+```bash
+# Run all maintained unit tests
+python -m pytest tests/unit
+
+# Run individual test modules
+python -m pytest tests/unit/test_adaptive_router.py
+python -m pytest tests/unit/test_retrieval_sufficiency.py
+python -m pytest tests/unit/test_response_validator.py
+```
+
+

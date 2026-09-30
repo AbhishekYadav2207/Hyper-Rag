@@ -54,9 +54,11 @@ from .operate import (
 )
 from .adaptive_router import AdaptiveRouter, AdaptiveDecision
 from .retrieval_sufficiency import RetrievalSufficiencyEvaluator, RetrievalSufficiency
+from .response_validator import ResponseValidator, ValidationResult
 from my_config import (
     ADAPTIVE_RAG_ENABLED,
     ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED,
+    ADAPTIVE_VALIDATION_ENABLED,
     ADAPTIVE_LOG_DECISIONS,
 )
 
@@ -120,9 +122,10 @@ class HyperRAG:
     addon_params: dict = field(default_factory=dict)
     convert_response_to_json_func: callable = convert_response_to_json
 
-    # adaptive routing & sufficiency evaluation
+    # adaptive routing & sufficiency evaluation & validation
     adaptive_router: Optional[Any] = None
     sufficiency_evaluator: Optional[Any] = None
+    response_validator: Optional[Any] = None
 
     def __post_init__(self):
         log_file = os.path.join(self.working_dir, "HyperRAG.log")
@@ -133,7 +136,10 @@ class HyperRAG:
             self.adaptive_router = AdaptiveRouter()
         if self.sufficiency_evaluator is None:
             self.sufficiency_evaluator = RetrievalSufficiencyEvaluator()
+        if self.response_validator is None and ADAPTIVE_VALIDATION_ENABLED:
+            self.response_validator = ResponseValidator()
         self.last_adaptive_decision: Optional[AdaptiveDecision] = None
+        self.last_validation_result: Optional[ValidationResult] = None
 
         logger.info(f"Logger initialized for working directory: {self.working_dir}")
 
@@ -484,6 +490,37 @@ class HyperRAG:
 
         await self._query_done()
 
+        # Phase 3: Response Validation
+        if ADAPTIVE_VALIDATION_ENABLED and self.response_validator is not None:
+            # Extract final answer string
+            if isinstance(response, dict) and "response" in response:
+                ans_str = str(response["response"])
+            else:
+                ans_str = str(response or "")
+
+            # Retrieve evidence context
+            retrieved_ctx = getattr(param, "last_context_json", None) or getattr(param, "last_context", None)
+            if retrieved_ctx is None and isinstance(response, dict):
+                retrieved_ctx = response
+            elif retrieved_ctx is None and "entity_context" in locals():
+                retrieved_ctx = entity_context
+
+            val_res = self.response_validator.validate(
+                query=query,
+                answer=ans_str,
+                retrieved_context=retrieved_ctx,
+                adaptive_decision=decision,
+                retrieval_metrics=decision.retrieval_metrics if decision else None,
+            )
+            self.last_validation_result = val_res
+            param.validation_result = val_res
+
+            if param.return_type == "json" and isinstance(response, dict):
+                response["validation"] = val_res.to_dict()
+        else:
+            self.last_validation_result = None
+            param.validation_result = None
+
         if param.return_type == "json" and isinstance(response, dict) and decision is not None:
             response["adaptive_decision"] = decision.to_dict()
 
@@ -505,6 +542,8 @@ class HyperRAG:
         # 把 stream func 放进 global_config
         cfg = asdict(self)
         cfg["llm_model_stream_func"] = self.llm_model_stream_func
+
+        collected_tokens: List[str] = []
 
         if decision is not None and effective_mode == "hyper-lite" and ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED:
             if self.sufficiency_evaluator is None:
@@ -558,6 +597,7 @@ class HyperRAG:
                     param,
                     cfg,
                 ):
+                    collected_tokens.append(tok)
                     yield tok
             else:
                 decision.final_mode = "lite"
@@ -581,6 +621,7 @@ class HyperRAG:
                     param,
                     cfg,
                 ):
+                    collected_tokens.append(tok)
                     yield tok
 
         elif decision is not None and effective_mode == "hyper":
@@ -604,6 +645,7 @@ class HyperRAG:
                 param,
                 cfg,
             ):
+                collected_tokens.append(tok)
                 yield tok
 
         elif effective_mode == "hyper":
@@ -616,6 +658,7 @@ class HyperRAG:
                     param,
                     cfg,
             ):
+                collected_tokens.append(tok)
                 yield tok
 
         elif effective_mode == "hyper-lite":
@@ -627,6 +670,7 @@ class HyperRAG:
                     param,
                     cfg,
             ):
+                collected_tokens.append(tok)
                 yield tok
 
         elif effective_mode == "naive":
@@ -637,16 +681,38 @@ class HyperRAG:
                     param,
                     cfg,
             ):
+                collected_tokens.append(tok)
                 yield tok
 
         elif effective_mode == "llm":
             async for tok in llm_query_stream(query, param, cfg):
+                collected_tokens.append(tok)
                 yield tok
 
         else:
             raise ValueError(f"Unknown mode {param.mode}")
 
         await self._query_done()
+
+        # Phase 3: Response Validation for streaming
+        full_answer = "".join(collected_tokens)
+        if ADAPTIVE_VALIDATION_ENABLED and self.response_validator is not None and full_answer:
+            retrieved_ctx = getattr(param, "last_context_json", None) or getattr(param, "last_context", None)
+            if retrieved_ctx is None and "entity_context" in locals():
+                retrieved_ctx = entity_context
+
+            val_res = self.response_validator.validate(
+                query=query,
+                answer=full_answer,
+                retrieved_context=retrieved_ctx,
+                adaptive_decision=decision,
+                retrieval_metrics=decision.retrieval_metrics if decision else None,
+            )
+            self.last_validation_result = val_res
+            param.validation_result = val_res
+        else:
+            self.last_validation_result = None
+            param.validation_result = None
 
 
     async def _query_done(self):
