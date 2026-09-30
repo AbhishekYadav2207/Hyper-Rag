@@ -362,14 +362,15 @@ The test suite enforces full regression testing across all phases:
   - `test_retrieval_sufficiency.py`: Tests Phase 2 retrieval sufficiency evaluation and Lite $\rightarrow$ Core escalation logic.
   - `test_response_validator.py`: Tests Phase 3 response validation across completeness, evidence support, relevance, unsupported claim detection, and failure modes.
   - `test_key_rotation.py`: Tests multi-key pool rotation, 429 backoff, 401 handling, and concurrency safety.
+  - `test_language_guard.py`: Tests deterministic Latin-script compliance and English-only validation.
   - `test_config.py`: Tests environment variable parsing and configuration invariants.
 - `tests/internal/`: Live diagnostic scripts verifying external upstream providers (OpenRouter LLM and Mistral embeddings).
 
 ### Running Tests
 
 ```bash
-# Run all maintained unit tests
-python -m pytest tests/unit
+# Run all maintained unit tests (67 tests, 0 warnings)
+python -m pytest tests/unit -v
 
 # Run individual test modules
 python -m pytest tests/unit/test_adaptive_router.py

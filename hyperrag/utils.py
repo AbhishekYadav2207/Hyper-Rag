@@ -23,16 +23,25 @@ logger = logging.getLogger("hyper_rag")
 def set_logger(log_file: str):
     logger.setLevel(logging.DEBUG)
 
-    file_handler = logging.FileHandler(log_file)
+    target_path = os.path.abspath(log_file)
+    if any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", None) == target_path for h in logger.handlers):
+        return
+
+    # Close and remove existing FileHandlers to prevent unclosed file leaks
+    for h in list(logger.handlers):
+        if isinstance(h, logging.FileHandler):
+            h.close()
+            logger.removeHandler(h)
+
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
-    if not logger.handlers:
-        logger.addHandler(file_handler)
 
 
 @dataclass

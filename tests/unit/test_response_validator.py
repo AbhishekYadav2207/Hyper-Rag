@@ -644,3 +644,45 @@ def test_22_disabled_validation(monkeypatch, tmp_path):
         assert qp.validation_result is None
 
     asyncio.run(_run())
+
+
+# =============================================================================
+# TEST 23: Context Combination & Null Handling Regression
+# =============================================================================
+
+def test_23_combine_contexts_null_handling():
+    """
+    Verify that combine_contexts handles None for relation_context, entity_context,
+    or both gracefully without throwing unhandled exceptions or emitting UserWarnings,
+    while returning valid formatted CSV context sections.
+    """
+    from hyperrag.operate import combine_contexts
+
+    # 1. Both None
+    ctx_both_none = combine_contexts(None, None)
+    assert "-----Entities-----" in ctx_both_none
+    assert "-----Relationships-----" in ctx_both_none
+    assert "-----Sources-----" in ctx_both_none
+
+    sample_context = (
+        "-----Entities-----\n```csv\nid,entity\n0,Diabetes\n```\n"
+        "-----Relationships-----\n```csv\nid,entity set,description\n0,Diabetes -> Insulin,regulates blood sugar\n```\n"
+        "-----Sources-----\n```csv\nid,content\n0,Diabetes article snippet\n```\n"
+    )
+
+    # 2. Relation context None, valid entity context
+    ctx_rel_none = combine_contexts(None, sample_context)
+    assert "Diabetes" in ctx_rel_none
+    assert "-----Entities-----" in ctx_rel_none
+    assert "-----Relationships-----" in ctx_rel_none
+
+    # 3. Entity context None, valid relation context
+    ctx_ent_none = combine_contexts(sample_context, None)
+    assert "Diabetes" in ctx_ent_none
+    assert "Insulin" in ctx_ent_none
+
+    # 4. Both valid
+    ctx_both_valid = combine_contexts(sample_context, sample_context)
+    assert "Diabetes" in ctx_both_valid
+    assert "Insulin" in ctx_both_valid
+

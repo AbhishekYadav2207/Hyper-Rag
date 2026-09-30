@@ -178,6 +178,7 @@ Hyper-RAG/
 │   │   ├── test_retrieval_sufficiency.py
 │   │   ├── test_response_validator.py
 │   │   ├── test_key_rotation.py
+│   │   ├── test_language_guard.py
 │   │   └── test_config.py
 │   └── internal/                 # Developer diagnostics (live external provider checks)
 │       ├── test_openrouter.py
@@ -685,6 +686,15 @@ python tests/internal/test_openrouter.py
 # Verify Mistral embeddings endpoint (1024 dimensions)
 python tests/internal/test_embedding.py
 ```
+
+#### 3. Full Pipeline Verification & Test Metrics Distinction
+To prevent confusion between heterogeneous layers, verification reporting strictly separates test metrics:
+- **Pytest Unit Tests (`tests/unit/`)**: 67 isolated, hermetic test cases executing with 0 warnings (`python -m pytest tests/unit -v`).
+- **Automated Pipeline Checks**: 32 system-level verification checks spanning environment configuration, Pydantic V2 modernization, API endpoints, Web UI views, and security filters.
+- **Web UI Views**: 6 interactive views verified (Chat with Adaptive RAG default, DB Explorer, Graph Visualization, File Manager, Swagger API Docs, Settings).
+- **API Endpoints**: 4 core FastAPI endpoints checked (`/`, `/databases`, `/settings`, `/hyperrag/status`).
+- **Verification Run Artifacts**: Verification runs generate structured logs under `logs/full_pipeline_YYYYMMDD_HHMMSS/` containing `SUMMARY.md`, `TEST_MATRIX.md`, `results.json`, `warnings.log`, `errors.log`, and interface screenshots.
+
 
 ## :memo: License
 

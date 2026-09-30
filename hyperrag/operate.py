@@ -1694,7 +1694,7 @@ def combine_contexts(relation_context, entity_context):
     # Extract sections from both contexts
 
     if relation_context is None:
-        warnings.warn(
+        logger.warning(
             "High Level context is None. Return empty High_Level entity/relationship/source"
         )
         hl_entities, hl_relationships, hl_sources = "", "", ""
@@ -1702,7 +1702,7 @@ def combine_contexts(relation_context, entity_context):
         hl_entities, hl_relationships, hl_sources = extract_sections(relation_context)
 
     if entity_context is None:
-        warnings.warn(
+        logger.warning(
             "Low Level context is None. Return empty Low_Level entity/relationship/source"
         )
         ll_entities, ll_relationships, ll_sources = "", "", ""
