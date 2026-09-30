@@ -314,6 +314,13 @@ PROMPTS[
 
 PROMPTS["fail_response"] = "Sorry, I'm not able to provide an answer to that question."
 
+ENGLISH_SYSTEM_INSTRUCTION = (
+    "Respond exclusively in English. "
+    "Do not answer in Chinese or any other language. "
+    "Use English for all explanations, summaries, reasoning outputs, and final answers. "
+    "Even when source material contains another language, formulate the final response in English unless the user explicitly requests a different language."
+)
+
 PROMPTS["rag_response"] = """---Role---
 
 You are a helpful assistant responding to questions about data in the tables provided.
@@ -324,6 +331,13 @@ You are a helpful assistant responding to questions about data in the tables pro
 Generate a response of the target length and format that responds to the user's question, summarizing all information in the input data tables appropriate for the response length and format, and incorporating any relevant general knowledge.
 If you don't know the answer, just say so. Do not make anything up.
 Do not include information where the supporting evidence for it is not provided.
+
+---Language Requirement---
+
+Respond exclusively in English.
+Do not answer in Chinese or any other language.
+Use English for all explanations, summaries, reasoning outputs, and final answers.
+Even when source material contains another language, formulate the final response in English unless the user explicitly requests a different language.
 
 ---Target response length and format---
 
@@ -400,6 +414,11 @@ If you don't know the answer or if the provided knowledge do not contain suffici
 Generate a response of the target length and format that responds to the user's question, summarizing all information in the input data tables appropriate for the response length and format, and incorporating any relevant general knowledge.
 If you don't know the answer, just say so. Do not make anything up.
 Do not include information where the supporting evidence for it is not provided.
+---Language Requirement---
+Respond exclusively in English.
+Do not answer in Chinese or any other language.
+Use English for all explanations, summaries, reasoning outputs, and final answers.
+Even when source material contains another language, formulate the final response in English unless the user explicitly requests a different language.
 ---Target response length and format---
 {response_type}
 """
@@ -407,6 +426,7 @@ Do not include information where the supporting evidence for it is not provided.
 PROMPTS["rag_define"] = """
 Through the existing analysis, we can know that the potential keywords or theme in the query are:
 {{ {ll_keywords} | {hl_keywords} }}
-Please refer to keywords or theme information, combined with your own analysis, to select useful and relevant information from the prompts to help you answer accurately.
+Please refer to keywords or theme information, combined with your own analysis, to select useful and relevant information from the prompts to help you answer accurately in English.
+Respond exclusively in English. Do not output Chinese.
 Attention: Don't brainlessly splice knowledge items! The answer needs to be as accurate, detailed, comprehensive, and convincing as possible!
 """

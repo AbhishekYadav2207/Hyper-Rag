@@ -20,8 +20,8 @@ const APIPage = () => {
         >
             {error && (
                 <Alert
-                    message="无法加载API文档"
-                    description={`请确保后端服务已启动并运行在 ${SERVER_URL}`}
+                    message="Failed to load API documentation"
+                    description={`Please ensure the backend service is running at ${SERVER_URL}`}
                     type="error"
                     showIcon
                     style={{ margin: 16 }}

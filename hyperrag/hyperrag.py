@@ -55,6 +55,7 @@ from .operate import (
 from .adaptive_router import AdaptiveRouter, AdaptiveDecision
 from .retrieval_sufficiency import RetrievalSufficiencyEvaluator, RetrievalSufficiency
 from .response_validator import ResponseValidator, ValidationResult
+from .language_guard import LanguageGuard, LanguageGuardResult
 from my_config import (
     ADAPTIVE_RAG_ENABLED,
     ADAPTIVE_RETRIEVAL_SUFFICIENCY_ENABLED,
@@ -122,10 +123,11 @@ class HyperRAG:
     addon_params: dict = field(default_factory=dict)
     convert_response_to_json_func: callable = convert_response_to_json
 
-    # adaptive routing & sufficiency evaluation & validation
+    # adaptive routing & sufficiency evaluation & validation & language guard
     adaptive_router: Optional[Any] = None
     sufficiency_evaluator: Optional[Any] = None
     response_validator: Optional[Any] = None
+    language_guard: Optional[Any] = None
 
     def __post_init__(self):
         log_file = os.path.join(self.working_dir, "HyperRAG.log")
@@ -138,8 +140,11 @@ class HyperRAG:
             self.sufficiency_evaluator = RetrievalSufficiencyEvaluator()
         if self.response_validator is None and ADAPTIVE_VALIDATION_ENABLED:
             self.response_validator = ResponseValidator()
+        if self.language_guard is None:
+            self.language_guard = LanguageGuard()
         self.last_adaptive_decision: Optional[AdaptiveDecision] = None
         self.last_validation_result: Optional[ValidationResult] = None
+        self.last_language_result: Optional[LanguageGuardResult] = None
 
         logger.info(f"Logger initialized for working directory: {self.working_dir}")
 
@@ -203,7 +208,7 @@ class HyperRAG:
         )
 
         if getattr(self, "llm_model_stream_func", None) is not None:
-            # 先把 hashing_kv 注入到 stream func（供 openai_complete_stream_if_cache 使用）
+            # Inject hashing_kv into stream func (used by openai_complete_stream_if_cache)
             self.llm_model_stream_func = limit_async_gen_call(self.llm_model_max_async)(
                 partial(
                     self.llm_model_stream_func,
@@ -524,12 +529,24 @@ class HyperRAG:
         if param.return_type == "json" and isinstance(response, dict) and decision is not None:
             response["adaptive_decision"] = decision.to_dict()
 
+        # Deterministic Language Guard verification
+        if self.language_guard is None:
+            self.language_guard = LanguageGuard()
+        ans_for_guard = response.get("response", "") if isinstance(response, dict) else str(response)
+        lang_res = self.language_guard.check(ans_for_guard)
+        self.last_language_result = lang_res
+        param.language_result = lang_res
+        if not lang_res.is_english:
+            logger.warning("[Language Guard] Generated response violated English-only requirement: %s", lang_res.reason)
+        if param.return_type == "json" and isinstance(response, dict):
+            response["language_guard"] = lang_res.to_dict()
+
         return response
 
     async def astream_query(self, query: str, param: QueryParam = QueryParam()):
         """
-        流式查询：返回 async generator（逐 token / 逐块）
-        依赖 self.llm_model_stream_func，不提供则抛错。
+        Streaming query: returns an async generator (token-by-token / chunk-by-chunk).
+        Requires self.llm_model_stream_func, raises AttributeError if not provided.
         """
         if self.llm_model_stream_func is None:
             raise AttributeError("llm_model_stream_func is not set, streaming is unavailable.")
@@ -539,7 +556,7 @@ class HyperRAG:
         if decision is not None:
             param.adaptive_decision = decision
 
-        # 把 stream func 放进 global_config
+        # Place stream func into global_config
         cfg = asdict(self)
         cfg["llm_model_stream_func"] = self.llm_model_stream_func
 
@@ -713,6 +730,19 @@ class HyperRAG:
         else:
             self.last_validation_result = None
             param.validation_result = None
+
+        # Deterministic Language Guard for streaming
+        if full_answer:
+            if self.language_guard is None:
+                self.language_guard = LanguageGuard()
+            lang_res = self.language_guard.check(full_answer)
+            self.last_language_result = lang_res
+            param.language_result = lang_res
+            if not lang_res.is_english:
+                logger.warning("[Language Guard] Streamed response violated English-only requirement: %s", lang_res.reason)
+        else:
+            self.last_language_result = None
+            param.language_result = None
 
 
     async def _query_done(self):

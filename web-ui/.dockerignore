@@ -1,4 +1,4 @@
-# Docker 忽略文件
+# Docker ignore file
 
 # Git
 .git
@@ -9,7 +9,7 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# Node modules (会在容器内重新安装)
+# Node modules (reinstalled in container)
 **/node_modules
 **/npm-debug.log*
 

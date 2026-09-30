@@ -3,22 +3,22 @@ import { createBrowserRouter, RouteObject, createHashRouter } from 'react-router
 import { routers } from './routers'
 
 export type RouteType = {
-  /** 是否隐藏菜单布局 */
+  /** Whether to hide menu layout */
   hideLayout?: boolean
-  /** 在菜单栏是否显示 */
+  /** Whether to display in menu bar */
   hideInMenu?: boolean
-  /** 权限控制 true 则都控制 */
+  /** Permission control: true controls all */
   permissionObj?: {
-    /** 是否进行页面权限控制，控制取后端数据 */
+    /** Page permission control */
     isPagePermission?: boolean
-    /** 判断token是否存在控制 */
+    /** Check if token exists */
     isToken?: boolean
   } & true
   children?: RouteType[]
 } & Partial<MenuDataItem> &
   RouteObject
 
-/** 只给最低层级套 Permission 组件 */
+/** Wrap Permission component only on lowest level */
 const renderElement = (item: RouteType) => {
   if (item?.element) {
     if (item?.children) {

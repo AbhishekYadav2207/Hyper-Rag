@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
     })
   ],
   resolve: {
-    extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json', '.sass', '.scss'], // 忽略输入的扩展名
+    extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json', '.sass', '.scss'], // Ignore file extensions on input
     alias: [
       { find: /^~/, replacement: '' },
       { find: '@', replacement: path.resolve(__dirname, 'src') },
@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => ({
   css: {
     preprocessorOptions: {
       less: {
-        // 支持内联 JavaScript
+        // Enable inline JavaScript
         javascriptEnabled: true
       }
     }
@@ -52,8 +52,17 @@ export default defineConfig(({ mode }) => ({
   server: {
     proxy: proxy[mode]
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext'
+    }
+  },
+  esbuild: {
+    target: 'esnext'
+  },
   build: {
-    // 打包出map文件
+    target: 'esnext',
+    // Output source map
     sourcemap: false
   }
 }))

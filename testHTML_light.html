@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -207,11 +207,11 @@
     }
 
     select option {
-      background-color: #0b1020;   /* 深色背景 */
+      background-color: #0b1020;   /* Dark background */
       color: rgba(255,255,255,0.92);
     }
 
-    /* 有些浏览器用 optgroup */
+    /* Support optgroup in browsers */
     select optgroup {
       background-color: #0b1020;
       color: rgba(255,255,255,0.75);
@@ -334,11 +334,11 @@
       <div class="brand">
         <h1>HyperRAG Console</h1>
         <p class="sub">
-          支持非流式 <code>/query</code> 与流式 <code>/query_stream</code>。
-          流式输出将实时以 Markdown 形式渲染。
+          Supports non-streaming <code>/query</code> and streaming <code>/query_stream</code>.
+          Streaming output is rendered in real time as Markdown.
         </p>
       </div>
-      <div class="statuspill" title="服务状态">
+      <div class="statuspill" title="Service Status">
         <span id="dot" class="dot"></span>
         <span id="statusText">Idle</span>
       </div>
@@ -375,7 +375,7 @@
           </div>
 
           <label>Question</label>
-          <textarea id="question">病理图中的核心内容是什么？</textarea>
+          <textarea id="question">What are the primary findings in the pathology analysis?</textarea>
 
           <div class="btns">
             <button id="sendBtn" class="primary">Send</button>
@@ -504,7 +504,7 @@
           return;
         }
 
-        // 兼容：如果后端返回 JSON {answer, ...}
+        // Compatibility: if backend returns JSON {answer, ...}
         if (data && typeof data === "object" && data.answer) {
           buffer = data.answer;
           const latency = data.latency_ms != null ? `${data.latency_ms} ms` : `${Math.round(performance.now() - t0)} ms`;
@@ -576,7 +576,7 @@
           received += chunk.length;
           buffer += chunk;
 
-          // meta 信息（简单展示：已接收字符数、耗时）
+          // Metadata: display received character count and elapsed time
           const ms = Math.round(performance.now() - startedAt);
           $("metaChip").textContent = `streaming · ${ms} ms · ${received} chars`;
         }

@@ -30,7 +30,7 @@ const BasicLayout: React.FC = props => {
 
   const [showLayout, setShowLayout] = useState(false)
 
-  /** 处理菜单权限隐藏菜单 */
+  /** Handle menu permissions to hide menus */
   const reduceRouter = (routers: RouteType[]): RouteType[] => {
     const authMenus = storeGlobalUser?.userInfo?.menus
       ?.filter(item => item?.type === ComponTypeEnum.MENU || item?.type === ComponTypeEnum.PAGE)
@@ -46,7 +46,7 @@ const BasicLayout: React.FC = props => {
         }
       }
 
-      // 为菜单项添加国际化支持
+      // Add internationalization support for menu items
       let translatedName = item?.name
       if (item?.path === '/Hyper/show') {
         translatedName = t('menu.graph')

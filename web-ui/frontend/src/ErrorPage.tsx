@@ -1,11 +1,11 @@
 import { useRouteError } from 'react-router-dom'
 
 const ErrorPage = () => {
-  // 使用 useRouteError 取得路由錯誤資訊
+  // Use useRouteError to get route error information
   const error: any = useRouteError()
   console.error(error)
 
-  //  页面刷新
+  //  Page refresh
   window.location.reload()
 
   return <div />

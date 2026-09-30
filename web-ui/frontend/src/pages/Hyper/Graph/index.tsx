@@ -24,13 +24,13 @@ const GraphPage = () => {
   const [verticesTotal, setVerticesTotal] = useState(0);
   const [verticesLoading, setVerticesLoading] = useState(false);
 
-  // 初始化数据库
+  // Initialize database
   useEffect(() => {
     storeGlobalUser.restoreSelectedDatabase();
     storeGlobalUser.loadDatabases();
   }, []);
 
-  // 获取vertices分页加载
+  // Paginated fetch of vertices
   const loadVertices = async (page = 1, append = false) => {
     setVerticesLoading(true);
     const pageSize = 50;
@@ -44,7 +44,7 @@ const GraphPage = () => {
     setVerticesLoading(false);
   };
 
-  // 获取vertices列表
+  // Get vertices list
   useEffect(() => {
     if (!storeGlobalUser.selectedDatabase) return;
 
@@ -53,10 +53,10 @@ const GraphPage = () => {
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        // 处理分页数据格式
+        // Process paginated data format
         const vertices = data.data || data;
         setKeys(vertices);
-        // 设置默认选中第一个vertex
+        // Default select first vertex
         if (vertices && vertices.length > 0) {
           setKey(vertices[0]);
         }
@@ -68,7 +68,7 @@ const GraphPage = () => {
       });
   }, [storeGlobalUser.selectedDatabase, t]);
 
-  // 初始化和数据库切换时加载第一页
+  // Load first page on init and db switch
   useEffect(() => {
     if (storeGlobalUser.selectedDatabase) {
       setVerticesList([]);
@@ -78,7 +78,7 @@ const GraphPage = () => {
     }
   }, [storeGlobalUser.selectedDatabase]);
 
-  // 获取选中实体的详细信息（用于右侧详情展示）
+  // Get selected entity details (for right detail panel)
   useEffect(() => {
     if (!key || !storeGlobalUser.selectedDatabase) return;
 
@@ -101,9 +101,9 @@ const GraphPage = () => {
       });
   }, [key, storeGlobalUser.selectedDatabase, t]);
 
-  // 数据库切换处理
+  // Handle database switch
   const onDatabaseChange = () => {
-    // 清空选择
+    // Clear selection
     setKey(undefined);
     setItem({
       entity_name: '',
@@ -113,7 +113,7 @@ const GraphPage = () => {
     });
   };
 
-  // 渲染加载状态
+  // Render loading state
   if (loading) {
     return (
       <div style={{
@@ -130,7 +130,7 @@ const GraphPage = () => {
     );
   }
 
-  // 渲染未选择数据库状态
+  // Render unselected database state
   if (!storeGlobalUser.selectedDatabase) {
     return (
       <div style={{
@@ -153,7 +153,7 @@ const GraphPage = () => {
     );
   }
 
-  // 渲染无数据状态
+  // Render empty data state
   if (!keys || keys.length === 0) {
     return (
       <div style={{
@@ -214,7 +214,7 @@ const GraphPage = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
-        {/* 使用HyperGraph组件展示超图 */}
+        {/* Display hypergraph using HyperGraph component */}
         <div style={{ width: '70%' }}>
           <HyperGraph
             vertexId={key}
@@ -226,7 +226,7 @@ const GraphPage = () => {
           />
         </div>
 
-        {/* 实体详情卡片 */}
+        {/* Entity detail card */}
         <Card 
           title={t('graph.entity_details')}
           style={{ width: '28%', height: '600px', overflow: 'auto' }}

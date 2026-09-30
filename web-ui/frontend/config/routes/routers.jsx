@@ -23,14 +23,14 @@ export const routers = [
     children: [
       {
         path: '/Hyper/chat',
-        name: '检索问答',
+        name: 'Chat Q&A',
         icon: <QuestionCircleOutlined />,
         // permissionObj: true,
         element: <Home />
       },
       {
         path: '/Hyper/show',
-        name: '超图展示',
+        name: 'HyperGraph',
         icon: <DeploymentUnitOutlined />,
         // permissionObj: true,
         element: <Graph />
@@ -44,19 +44,19 @@ export const routers = [
       },
       {
         path: '/Hyper/files',
-        name: '文档解析',
+        name: 'Document Parser',
         icon: <FileAddOutlined />,
         element: <Files />,
       },
       {
         path: '/API',
-        name: 'API 文档',
+        name: 'API Docs',
         icon: <ApiOutlined />,
         element: <APIPage />,
       },
       {
         path: '/Setting',
-        name: '系统设置',
+        name: 'Settings',
         icon: <SettingOutlined />,
         // permissionObj: true,
         element: <Setting />

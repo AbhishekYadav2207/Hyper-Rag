@@ -62,7 +62,7 @@ export default {
         },
     },
     plugins: [],
-    // 确保与 Ant Design 兼容
+    // Ensure compatibility with Ant Design
     corePlugins: {
         preflight: false,
     },

@@ -15,7 +15,7 @@ const colors = [
   '#c8ff00'
 ]
 
-//  colors 加深
+// Darken colors
 const entityTypeColors = {
   PERSON: '#00C9C9',
   CONCEPT: '#a68fff',
@@ -33,13 +33,13 @@ const RetrievalHyperGraph = ({
   showTooltip = true,
   containerStyle = {},
   graphId = 'retrieval-hypergraph',
-  mode = 'hyper' // 新增mode参数，默认为hyper模式
+  mode = 'hyper' // mode parameter, default to hyper
 }) => {
   const { t } = useTranslation()
   const edgesName = mode === 'hyper' ? t('retrieval.hyperedge_count') : t('retrieval.edge_count')
-  // 转换数据格式为HyperGraph组件需要的格式
+  // Transform data into HyperGraph format
   const convertedData = useMemo(() => {
-    // 如果没有数据，返回空
+    // Return empty if no data
     if (!entities.length && !hyperedges.length) {
       return null
     }
@@ -47,7 +47,7 @@ const RetrievalHyperGraph = ({
     const vertices = {}
     const edges = {}
 
-    // 处理实体数据
+    // Process entity data
     entities.forEach(entity => {
       const entityName = String(entity.entity_name || entity.name || `Entity_${Math.random()}`)
       vertices[entityName] = {
@@ -58,16 +58,16 @@ const RetrievalHyperGraph = ({
       }
     })
 
-    // 处理超边数据
+    // Process hyperedge data
     hyperedges.forEach((edge, index) => {
-      // 构建超边的键名，使用|#|分隔实体
+      // Construct hyperedge key, delimit entities with |#|
       let edgeKey
       if (Array.isArray(edge.entity_set)) {
         edgeKey = edge.entity_set.map(e => String(e)).join('|#|')
       } else if (typeof edge.entity_set === 'string') {
         edgeKey = edge.entity_set
       } else if (edge.id_set) {
-        // 如果没有entity_set但有id_set，使用id_set
+        // If no entity_set but id_set exists, use id_set
         edgeKey = Array.isArray(edge.id_set)
           ? edge.id_set.map(e => String(e)).join('|#|')
           : String(edge.id_set)
@@ -75,7 +75,7 @@ const RetrievalHyperGraph = ({
         edgeKey = `edge_${index}`
       }
 
-      // 确保超边中的实体也在vertices中
+      // Ensure hyperedge entities are in vertices
       const entityNames = edgeKey.split('|#|')
       entityNames.forEach(entityName => {
         if (!vertices[entityName]) {
@@ -105,23 +105,23 @@ const RetrievalHyperGraph = ({
     const plugins = []
 
     if (convertedData) {
-      // 添加顶点
+      // Add vertices
       for (const key in convertedData.vertices) {
         hyperData.nodes.push({
           ...convertedData.vertices[key],
           id: key,
-          label: String(key) // 确保label是字符串
+          label: String(key) // Ensure label is string
         })
       }
 
       if (mode === 'graph') {
-        // graph模式：设置标准边格式，不使用plugins
+        // graph mode: set standard edge format without plugins
         const edgeKeys = Object.keys(convertedData.edges)
         for (let i = 0; i < edgeKeys.length; i++) {
           const key = edgeKeys[i]
           const nodes = key.split('|#|')
 
-          // 为每对节点创建边
+          // Create edges for each node pair
           for (let j = 0; j < nodes.length; j++) {
             for (let k = j + 1; k < nodes.length; k++) {
               hyperData.edges.push({
@@ -133,8 +133,8 @@ const RetrievalHyperGraph = ({
           }
         }
       } else {
-        // hyper模式：使用原有的bubble-sets插件
-        // 创建样式函数
+        // hyper mode: use bubble-sets plugin
+        // Create style function
         const createStyle = baseColor => ({
           fill: baseColor,
           stroke: baseColor,
@@ -144,7 +144,7 @@ const RetrievalHyperGraph = ({
           labelBackgroundRadius: 5,
           labelPlacement: 'center',
           labelAutoRotate: false,
-          // bubblesets配置
+          // BubbleSets configuration
           maxRoutingIterations: 100,
           maxMarchingIterations: 20,
           pixelGroup: 4,
@@ -160,7 +160,7 @@ const RetrievalHyperGraph = ({
           virtualEdges: true
         })
 
-        // 添加超边
+        // Add hyperedges
         const edgeKeys = Object.keys(convertedData.edges)
         for (let i = 0; i < edgeKeys.length; i++) {
           const key = edgeKeys[i]
@@ -171,13 +171,13 @@ const RetrievalHyperGraph = ({
             key: `bubble-sets-${key}`,
             type: 'bubble-sets',
             members: nodes,
-            // labelText: String(edge.keywords || ''), // 确保labelText是字符串
+            // labelText: String(edge.keywords || ''), // Ensure labelText is string
             ...createStyle(colors[i % colors.length])
           })
         }
       }
 
-      // 添加tooltip插件
+      // Add tooltip plugin
       if (showTooltip) {
         plugins.push({
           type: 'tooltip',
@@ -213,18 +213,18 @@ const RetrievalHyperGraph = ({
           size: mode === 'graph' ? 20 : 25,
           labelText: d => d.id,
           fill: d => {
-            // 根据entity_type设置不同颜色
+            // Set colors by entity_type
             if (d.entity_type) {
               return entityTypeColors[d.entity_type] || '#8566CC'
             }
-            // 默认颜色
+            // Default color
             return '#8566CC'
           }
         }
       },
       edge: {
         style: {
-          stroke: '#a68fff', // 边的颜色
+          stroke: '#a68fff', // Edge color
           lineWidth: 3
         }
       },
@@ -244,7 +244,7 @@ const RetrievalHyperGraph = ({
     }
   }, [convertedData, showTooltip, mode, t])
 
-  // 如果没有数据，不显示组件
+  // If no data, do not display
   if (!convertedData || (!entities.length && !hyperedges.length)) {
     return null
   }

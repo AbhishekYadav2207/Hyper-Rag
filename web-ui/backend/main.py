@@ -10,16 +10,26 @@ import logging
 import sys
 import importlib.util
 from pathlib import Path
+
+# Ensure UTF-8 output on Windows console
+if sys.platform == "win32":
+    try:
+        if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 from pydantic import BaseModel
 from typing import List
 from io import StringIO
 
-# 添加 HyperRAG 相关导入
-# 若尚不可导入，则向上逐级查找含有 hyperrag 包的目录，并把“其父目录”加到 sys.path
+# Add HyperRAG related imports
+# If not importable, look upward for directory containing hyperrag and add to sys.path
 if importlib.util.find_spec("hyperrag") is None:
     for parent in Path(__file__).resolve().parents:
         if (parent / "hyperrag" / "__init__.py").exists():
-            sys.path.insert(0, str(parent))  # 注意是父目录，不是 …/hyperrag
+            sys.path.insert(0, str(parent))  # Note: parent directory, not .../hyperrag
             break
 
 try:
@@ -32,7 +42,7 @@ except ImportError as e:
     HYPERRAG_AVAILABLE = False
 
 
-# 设置文件路径
+# Set file paths
 SETTINGS_FILE = "settings.json"
 
 app = FastAPI()
@@ -53,7 +63,7 @@ async def root():
 @app.get("/db")
 async def db(database: str = None):
     """
-    获取全部数据json
+    Get full hypergraph data JSON
     """
     try:
         data = get_hypergraph(database)
@@ -64,7 +74,7 @@ async def db(database: str = None):
 @app.get("/db/vertices")
 async def get_vertices_function(database: str = None, page: int = None, page_size: int = None):
     """
-    获取vertices列表
+    Get vertices list
     """
     try:
         data = getFrequentVertices(database, page, page_size)
@@ -75,7 +85,7 @@ async def get_vertices_function(database: str = None, page: int = None, page_siz
 @app.get("/db/hyperedges")
 async def get_hypergraph_function(database: str = None, page: int = None, page_size: int = None):
     """
-    获取hyperedges列表
+    Get hyperedges list
     """
     try:
         data = get_hyperedges(database, page, page_size)
@@ -86,7 +96,7 @@ async def get_hypergraph_function(database: str = None, page: int = None, page_s
 @app.get("/db/hyperedges/{hyperedge_id}")
 async def get_hyperedge(hyperedge_id: str, database: str = None):
     """
-    获取指定hyperedge的详情
+    Get details of specified hyperedge
     """
     try:
         hyperedge_id = hyperedge_id.replace("%20", " ")
@@ -99,7 +109,7 @@ async def get_hyperedge(hyperedge_id: str, database: str = None):
 @app.get("/db/vertices/{vertex_id}")
 async def get_vertex(vertex_id: str, database: str = None):
     """
-    获取指定vertex的json
+    Get specified vertex JSON
     """
     vertex_id = vertex_id.replace("%20", " ")
     try:
@@ -111,7 +121,7 @@ async def get_vertex(vertex_id: str, database: str = None):
 @app.get("/db/vertices_neighbor/{vertex_id}")
 async def get_vertex_neighbor(vertex_id: str, database: str = None):
     """
-    获取指定vertex的neighbor
+    Get neighbors of specified vertex
     """
     vertex_id = vertex_id.replace("%20", " ")
     try:
@@ -123,7 +133,7 @@ async def get_vertex_neighbor(vertex_id: str, database: str = None):
 @app.get("/db/hyperedge_neighbor/{hyperedge_id}")
 async def get_hyperedge_neighbor(hyperedge_id: str, database: str = None):
     """
-    获取指定hyperedge的neighbor
+    Get neighbors of specified hyperedge
     """
     hyperedge_id = hyperedge_id.replace("%20", " ")
     hyperedge_id = hyperedge_id.replace("*", "#")
@@ -163,7 +173,7 @@ class HyperedgeUpdateModel(BaseModel):
 @app.post("/db/vertices")
 async def create_vertex(vertex: VertexModel):
     """
-    创建新的vertex
+    Create new vertex
     """
     try:
         result = add_vertex(vertex.vertex_id, {
@@ -179,7 +189,7 @@ async def create_vertex(vertex: VertexModel):
 @app.post("/db/hyperedges")
 async def create_hyperedge(hyperedge: HyperedgeModel):
     """
-    创建新的hyperedge
+    Create new hyperedge
     """
     try:
         result = add_hyperedge(hyperedge.vertices, {
@@ -193,7 +203,7 @@ async def create_hyperedge(hyperedge: HyperedgeModel):
 @app.put("/db/vertices/{vertex_id}")
 async def update_vertex_endpoint(vertex_id: str, vertex: VertexUpdateModel):
     """
-    更新vertex信息
+    Update vertex information
     """
     try:
         vertex_id = vertex_id.replace("%20", " ")
@@ -210,7 +220,7 @@ async def update_vertex_endpoint(vertex_id: str, vertex: VertexUpdateModel):
 @app.put("/db/hyperedges/{hyperedge_id}")
 async def update_hyperedge_endpoint(hyperedge_id: str, hyperedge: HyperedgeUpdateModel):
     """
-    更新hyperedge信息
+    Update hyperedge information
     """
     try:
         hyperedge_id = hyperedge_id.replace("%20", " ")
@@ -226,7 +236,7 @@ async def update_hyperedge_endpoint(hyperedge_id: str, hyperedge: HyperedgeUpdat
 @app.delete("/db/vertices/{vertex_id}")
 async def delete_vertex_endpoint(vertex_id: str, database: str = None):
     """
-    删除vertex
+    Delete vertex
     """
     try:
         vertex_id = vertex_id.replace("%20", " ")
@@ -238,7 +248,7 @@ async def delete_vertex_endpoint(vertex_id: str, database: str = None):
 @app.delete("/db/hyperedges/{hyperedge_id}")
 async def delete_hyperedge_endpoint(hyperedge_id: str, database: str = None):
     """
-    删除hyperedge
+    Delete hyperedge
     """
     try:
         hyperedge_id = hyperedge_id.replace("%20", " ")
@@ -248,7 +258,7 @@ async def delete_hyperedge_endpoint(hyperedge_id: str, database: str = None):
     except Exception as e:
         return {"success": False, "message": str(e)}
 
-# 设置相关的API接口
+# Settings related API endpoints
 
 class SettingsModel(BaseModel):
     apiKey: str = ""
@@ -258,7 +268,7 @@ class SettingsModel(BaseModel):
     selectedDatabase: str = ""
     maxTokens: int = 2000
     temperature: float = 0.7
-    # HyperRAG 嵌入模型设置
+    # HyperRAG embedding model settings
     embeddingModel: str = "text-embedding-3-small"
     embeddingDim: int = 1536
 
@@ -274,19 +284,19 @@ class DatabaseTestModel(BaseModel):
 @app.get("/settings")
 async def get_settings():
     """
-    获取系统设置
+    Get system settings
     """
     try:
         if os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
                 settings = json.load(f)
-            # 不返回敏感信息如API Key
+            # Do not return sensitive info such as API keys
             settings_safe = settings.copy()
             if 'apiKey' in settings_safe:
                 settings_safe['apiKey'] = '***' if settings_safe['apiKey'] else ''
             return settings_safe
         else:
-            # 返回默认设置
+            # Return default settings
             return {
                 "apiKey": "",
                 "modelProvider": "openai",
@@ -304,50 +314,50 @@ async def get_settings():
 @app.post("/settings")
 async def save_settings(settings: SettingsModel):
     """
-    保存系统设置
+    Save system settings
     """
     try:
         settings_dict = settings.dict()
         
-        # 如果apiKey是***，则保持原有的apiKey不变
+        # If apiKey is ***, keep original apiKey unchanged
         if settings_dict.get('apiKey') == '***':
-            # 读取现有设置中的apiKey
+            # Read existing apiKey from settings
             if os.path.exists(SETTINGS_FILE):
                 with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
                     existing_settings = json.load(f)
-                # 保持原有的apiKey
+                # Keep original apiKey
                 settings_dict['apiKey'] = existing_settings.get('apiKey', '')
             else:
-                # 如果没有现有设置文件，则设为空字符串
+                # If no existing settings file, set to empty string
                 settings_dict['apiKey'] = ''
         
         with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
             json.dump(settings_dict, f, ensure_ascii=False, indent=2)
-        return {"success": True, "message": "设置保存成功"}
+        return {"success": True, "message": "Settings saved successfully"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
 @app.get("/databases")
 async def get_databases():
     """
-    获取可用数据库列表
+    Get list of available databases
     """
     try:
         databases = []
         
-        # 使用db_manager获取数据库列表
+        # Use db_manager to get databases list
         database_files = db_manager.list_databases()
         
         for file in database_files:
-            # 根据文件名推断描述
-            description = f"{file.replace('.hgdb', '')}超图"
+            # Infer description from file name
+            description = f"{file.replace('.hgdb', '')} hypergraph"
             
             databases.append({
                 "name": file,
                 "description": description
             })
         
-        # 如果没有找到数据库文件，返回默认列表
+        # If no database files found, return default list
         if not databases:
             databases = []
         
@@ -358,54 +368,54 @@ async def get_databases():
 @app.post("/test-api")
 async def test_api_connection(api_test: APITestModel):
     """
-    测试API连接
+    Test API connection
     """
     try:
         from openai import OpenAI
         
-        # 根据不同的模型提供商进行测试
+        # Test according to different model providers
         if api_test.modelProvider == "openai":
             client = OpenAI(
                 api_key=api_test.apiKey,
                 base_url=api_test.baseUrl
             )
             
-            # 发送一个简单的测试请求
+            # Send a simple test request
             response = client.chat.completions.create(
                 model=api_test.modelName,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=10
             )
             
-            return {"success": True, "message": "API连接测试成功"}
+            return {"success": True, "message": "API connection test successful"}
             
         elif api_test.modelProvider == "anthropic":
-            # 对于Anthropic，可以添加相应的测试逻辑
-            return {"success": True, "message": "Anthropic API连接测试成功"}
+            # For Anthropic, test logic can be added
+            return {"success": True, "message": "Anthropic API connection test successful"}
             
         else:
-            # 对于其他提供商，进行通用测试
-            return {"success": True, "message": "API连接测试成功"}
+            # For other providers, run generic test
+            return {"success": True, "message": "API connection test successful"}
             
     except Exception as e:
-        return {"success": False, "message": f"API连接测试失败: {str(e)}"}
+        return {"success": False, "message": f"API connection test failed: {str(e)}"}
 
 @app.post("/test-database")
 async def test_database_connection(db_test: DatabaseTestModel):
     """
-    测试数据库连接
+    Test database connection
     """
     try:
-        # 使用db_manager测试数据库连接
+        # Test database connection using db_manager
         db = db_manager.get_database(db_test.database)
         
-        # 尝试获取数据库的基本信息来验证连接
+        # Attempt to get database basic info to verify connection
         vertices_count = len(db.all_v)
         edges_count = len(db.all_e)
         
         return {
             "success": True, 
-            "message": "数据库连接测试成功",
+            "message": "Database connection test successful",
             "info": {
                 "vertices_count": vertices_count,
                 "edges_count": edges_count,
@@ -414,31 +424,73 @@ async def test_database_connection(db_test: DatabaseTestModel):
         }
         
     except Exception as e:
-        return {"success": False, "message": f"数据库连接测试失败: {str(e)}"}
+        return {"success": False, "message": f"Database connection test failed: {str(e)}"}
 
 
-# 全局 HyperRAG 实例 - 改为字典来支持多数据库
+# Global HyperRAG instances - dictionary to support multiple databases
 hyperrag_instances = {}
-hyperrag_working_dir = "hyperrag_cache"
+_repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_root_cache = os.path.join(_repo_root, "hyperrag_cache")
+hyperrag_working_dir = _root_cache if os.path.exists(_root_cache) else "hyperrag_cache"
+
+def get_effective_settings() -> dict:
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+                if settings and isinstance(settings, dict):
+                    return settings
+        except Exception:
+            pass
+    try:
+        from my_config import (
+            OPENROUTER_MODEL, OPENROUTER_BASE_URL, OPENROUTER_API_KEY,
+            EMB_MODEL, EMB_BASE_URL, EMB_API_KEY, EMB_DIM
+        )
+        return {
+            "modelProvider": "openrouter",
+            "modelName": OPENROUTER_MODEL,
+            "baseUrl": OPENROUTER_BASE_URL,
+            "apiKey": OPENROUTER_API_KEY,
+            "embeddingModel": EMB_MODEL,
+            "embeddingBaseUrl": EMB_BASE_URL,
+            "embeddingApiKey": EMB_API_KEY,
+            "embeddingDim": EMB_DIM,
+            "selectedDatabase": "",
+            "maxTokens": 2000,
+            "temperature": 0.7,
+        }
+    except Exception:
+        return {
+            "modelProvider": "openrouter",
+            "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "baseUrl": "https://openrouter.ai/api/v1",
+            "apiKey": "",
+            "embeddingModel": "mistral-embed",
+            "embeddingBaseUrl": "https://api.mistral.ai/v1",
+            "embeddingApiKey": "",
+            "embeddingDim": 1024,
+            "selectedDatabase": "",
+            "maxTokens": 2000,
+            "temperature": 0.7,
+        }
 
 async def get_hyperrag_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs) -> str:
     """
-    HyperRAG 专用的 LLM 函数，使用异步版本
+    HyperRAG specialized LLM function (async version)
     """
     try:
-        main_logger.info(f"开始LLM调用，prompt长度: {len(prompt)} 字符")
+        main_logger.info(f"Starting LLM call, prompt length: {len(prompt)} chars")
         if system_prompt:
-            main_logger.info(f"系统提示词长度: {len(system_prompt)} 字符")
+            main_logger.info(f"System prompt length: {len(system_prompt)} chars")
         
-        # 从设置文件读取配置
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
+        settings = get_effective_settings()
         
-        model_name = settings.get("modelName", "gpt-5-mini")
+        model_name = settings.get("modelName", "nvidia/nemotron-3-ultra-550b-a55b:free")
         api_key = settings.get("apiKey")
         base_url = settings.get("baseUrl")
         
-        main_logger.info(f"使用模型: {model_name}, API地址: {base_url}")
+        main_logger.info(f"Using model: {model_name}, API base: {base_url}")
         
         response = await openai_complete_if_cache(
             model_name,
@@ -450,30 +502,53 @@ async def get_hyperrag_llm_func(prompt, system_prompt=None, history_messages=[],
             **kwargs,
         )
         
-        main_logger.info(f"LLM调用完成，响应长度: {len(response)} 字符")
+        main_logger.info(f"LLM call complete, response length: {len(response)} chars")
         return response
         
     except Exception as e:
-        main_logger.error(f"LLM调用失败: {str(e)}")
+        main_logger.error(f"LLM call failed: {str(e)}")
         raise
 
-async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
+async def get_hyperrag_llm_stream_func(prompt, system_prompt=None, history_messages=[], **kwargs):
     """
-    HyperRAG 专用的嵌入函数
+    HyperRAG specialized streaming LLM function
     """
     try:
-        main_logger.info(f"开始文本嵌入，文本数量: {len(texts)}")
-        main_logger.info(f"文本总长度: {sum(len(text) for text in texts)} 字符")
-        
-        # 从设置文件读取配置
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
-        
-        embedding_model = settings.get("embeddingModel", "text-embedding-3-small")
+        from hyperrag.llm import openrouter_mistral_stream_if_cache
+        settings = get_effective_settings()
+        model_name = settings.get("modelName", "nvidia/nemotron-3-ultra-550b-a55b:free")
         api_key = settings.get("apiKey")
         base_url = settings.get("baseUrl")
         
-        main_logger.info(f"使用嵌入模型: {embedding_model}")
+        async for tok in openrouter_mistral_stream_if_cache(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            history_messages=history_messages or [],
+            model=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            **kwargs,
+        ):
+            yield tok
+    except Exception as e:
+        main_logger.error(f"LLM streaming failed: {str(e)}")
+        yield f"[STREAM_ERROR: {e}]"
+
+async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
+    """
+    HyperRAG specialized embedding function
+    """
+    try:
+        main_logger.info(f"Starting text embedding for {len(texts)} chunks")
+        main_logger.info(f"Total chunk length: {sum(len(text) for text in texts)} chars")
+        
+        settings = get_effective_settings()
+        
+        embedding_model = settings.get("embeddingModel", "mistral-embed")
+        api_key = settings.get("embeddingApiKey") or settings.get("apiKey")
+        base_url = settings.get("embeddingBaseUrl") or settings.get("baseUrl")
+        
+        main_logger.info(f"Using embedding model: {embedding_model}")
         
         embeddings = await openai_embedding(
             texts,
@@ -482,62 +557,64 @@ async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
             base_url=base_url,
         )
         
-        main_logger.info(f"文本嵌入完成，嵌入维度: {embeddings.shape}")
+        main_logger.info(f"Text embedding complete, shape: {embeddings.shape}")
         return embeddings
         
     except Exception as e:
-        main_logger.error(f"文本嵌入失败: {str(e)}")
+        main_logger.error(f"Text embedding failed: {str(e)}")
         raise
 
 def get_or_create_hyperrag(database: str = None):
     """
-    获取或创建指定数据库的 HyperRAG 实例
+    Get or create HyperRAG instance for specified database
     """
     global hyperrag_instances
     
     if not HYPERRAG_AVAILABLE:
-        main_logger.error("HyperRAG 不可用")
+        main_logger.error("HyperRAG is not available")
         raise RuntimeError("HyperRAG is not available")
     
-    # 如果没有指定数据库，使用默认数据库
+    # If no database specified, use default database
     if database is None:
         database = db_manager.default_database
-        main_logger.info(f"使用默认数据库: {database}")
+        main_logger.info(f"Using default database: {database}")
     
-    # 检查是否已存在该数据库的实例
+    # Check if instance already exists for this database
     if database not in hyperrag_instances:
-        main_logger.info(f"创建新的HyperRAG实例，数据库: {database}")
+        main_logger.info(f"Creating new HyperRAG instance for database: {database}")
         
-        # 使用数据库名作为工作目录（去掉.hgdb后缀）
+        # Use database name as working directory (strip .hgdb suffix)
         if database.endswith('.hgdb'):
             db_dir_name = database.replace('.hgdb', '')
         else:
             db_dir_name = database
             
-        # HyperRAG 工作目录直接使用 hyperrag_cache 下的数据库文件夹
+        # HyperRAG working dir uses database folder under hyperrag_cache
         db_working_dir = os.path.join(hyperrag_working_dir, db_dir_name)
         Path(db_working_dir).mkdir(parents=True, exist_ok=True)
         
-        main_logger.info(f"HyperRAG工作目录: {db_working_dir}")
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
+        main_logger.info(f"HyperRAG working dir: {db_working_dir}")
+        settings = get_effective_settings()
             
-        embedding_dim = settings.get("embeddingDim")
+        embedding_dim = settings.get("embeddingDim", 1024)
         
-        # 初始化 HyperRAG 实例
+        # Initialize HyperRAG instance
         hyperrag_instances[database] = HyperRAG(
             working_dir=db_working_dir,
             llm_model_func=get_hyperrag_llm_func,
+            llm_model_stream_func=get_hyperrag_llm_stream_func,
             embedding_func=EmbeddingFunc(
-                embedding_dim=embedding_dim,  # text-embedding-3-small 的维度
+                embedding_dim=embedding_dim,
                 max_token_size=8192,
                 func=get_hyperrag_embedding_func
             ),
         )
         
-        main_logger.info(f"HyperRAG实例创建完成，数据库: {database}")
+        main_logger.info(f"HyperRAG instance initialized successfully for database: {database}")
     else:
-        main_logger.info(f"使用现有HyperRAG实例，数据库: {database}")
+        main_logger.info(f"Using existing HyperRAG instance for database: {database}")
+    
+    return hyperrag_instances[database]
     
     return hyperrag_instances[database]
 
@@ -554,28 +631,28 @@ async def process_message(msg: Message):
         return {"response": str(e)} 
     return {"response": response_message}
 
-# HyperRAG 问答相关接口
+# HyperRAG QA related endpoints
 
 class DocumentModel(BaseModel):
     content: str
     retries: int = 3
-    database: str = None  # 添加数据库参数
+    database: str = None  # Database parameter
 
 class QueryModel(BaseModel):
     question: str
-    mode: str = "hyper"  # hyper, hyper-lite, naive
+    mode: str = "adaptive"  # adaptive, hyper, hyper-lite, naive
     top_k: int = 60
     max_token_for_text_unit: int = 1600
     max_token_for_entity_context: int = 300
     max_token_for_relation_context: int = 1600
     only_need_context: bool = False
     response_type: str = "Multiple Paragraphs"
-    database: str = None  # 添加数据库参数
+    database: str = None  # Database parameter
 
 @app.post("/hyperrag/insert")
 async def insert_document(doc: DocumentModel):
     """
-    向指定数据库的 HyperRAG 插入文档
+    Insert document into specified database HyperRAG instance
     """
     if not HYPERRAG_AVAILABLE:
         return {"success": False, "message": "HyperRAG is not available"}
@@ -583,7 +660,7 @@ async def insert_document(doc: DocumentModel):
     try:
         rag = get_or_create_hyperrag(doc.database)
         
-        # 重试机制
+        # Retry mechanism
         for attempt in range(doc.retries):
             try:
                 await rag.ainsert(doc.content)
@@ -604,7 +681,7 @@ async def insert_document(doc: DocumentModel):
 @app.post("/hyperrag/query")
 async def query_hyperrag(query: QueryModel):
     """
-    使用指定数据库的 HyperRAG 进行问答查询
+    Query HyperRAG for specified database
     """
     if not HYPERRAG_AVAILABLE:
         return {"success": False, "message": "HyperRAG is not available"}
@@ -612,7 +689,7 @@ async def query_hyperrag(query: QueryModel):
     try:
         rag = get_or_create_hyperrag(query.database)
         
-        # 创建查询参数
+        # Create query parameters
         param = QueryParam(
             mode=query.mode,
             top_k=query.top_k,
@@ -624,10 +701,25 @@ async def query_hyperrag(query: QueryModel):
             return_type='json'
         )
         
-        # 执行查询
+        # Execute query
         result = await rag.aquery(query.question, param)
         
-        # 处理结果格式
+        # Format results
+        decision_dict = result.get("adaptive_decision") or (
+            rag.last_adaptive_decision.to_dict()
+            if getattr(rag, "last_adaptive_decision", None)
+            else None
+        )
+        val_dict = result.get("validation") or (
+            rag.last_validation_result.to_dict()
+            if getattr(rag, "last_validation_result", None)
+            else None
+        )
+        lang_dict = result.get("language_guard") or (
+            rag.last_language_result.to_dict()
+            if getattr(rag, "last_language_result", None)
+            else None
+        )
         return {
             "success": True,
             "response": result.get("response", ""),
@@ -636,16 +728,54 @@ async def query_hyperrag(query: QueryModel):
             "text_units": result.get("text_units", []),
             "mode": query.mode,
             "question": query.question,
-            "database": query.database or "default"
+            "database": query.database or "default",
+            "adaptive_decision": decision_dict,
+            "validation": val_dict,
+            "language_guard": lang_dict,
         }
         
     except Exception as e:
         return {"success": False, "message": f"Query failed: {str(e)}"}
 
+@app.post("/hyperrag/query_stream")
+async def query_hyperrag_stream(query: QueryModel):
+    """
+    Stream HyperRAG query token-by-token.
+    """
+    if not HYPERRAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="HyperRAG is not available")
+
+    try:
+        rag = get_or_create_hyperrag(query.database)
+        param = QueryParam(
+            mode=query.mode,
+            top_k=query.top_k,
+            max_token_for_text_unit=query.max_token_for_text_unit,
+            max_token_for_entity_context=query.max_token_for_entity_context,
+            max_token_for_relation_context=query.max_token_for_relation_context,
+            only_need_context=query.only_need_context,
+            response_type=query.response_type,
+        )
+
+        from fastapi.responses import StreamingResponse
+
+        async def stream_generator():
+            try:
+                async for token in rag.astream_query(query.question, param):
+                    if token:
+                        yield token
+                    await asyncio.sleep(0)
+            except Exception as stream_err:
+                yield f"\n[STREAM_ERROR: {stream_err}]"
+
+        return StreamingResponse(stream_generator(), media_type="text/plain; charset=utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query stream failed: {str(e)}")
+
 @app.get("/hyperrag/status")
 async def get_hyperrag_status(database: str = None):
     """
-    获取指定数据库的 HyperRAG 实例状态
+    Get status of HyperRAG instance for specified database
     """
     try:
         status = {
@@ -656,7 +786,7 @@ async def get_hyperrag_status(database: str = None):
         }
         
         if database:
-            # 获取特定数据库的状态
+            # Get status for specific database
             if database in hyperrag_instances:
                 instance = hyperrag_instances[database]
                 status["initialized"] = True
@@ -672,7 +802,7 @@ async def get_hyperrag_status(database: str = None):
             else:
                 status["initialized"] = False
         else:
-            # 获取所有实例的概览
+            # Get overview of all instances
             status["initialized"] = len(hyperrag_instances) > 0
             status["total_instances"] = len(hyperrag_instances)
         
@@ -684,13 +814,13 @@ async def get_hyperrag_status(database: str = None):
 @app.delete("/hyperrag/reset")
 async def reset_hyperrag(database: str = None):
     """
-    重置指定数据库的 HyperRAG 实例，或重置所有实例
+    Reset HyperRAG instance for specified database, or all instances
     """
     global hyperrag_instances
     
     try:
         if database:
-            # 重置特定数据库的实例
+            # Reset instance for specific database
             if database in hyperrag_instances:
                 del hyperrag_instances[database]
                 return {
@@ -703,14 +833,14 @@ async def reset_hyperrag(database: str = None):
                     "message": f"No HyperRAG instance found for database '{database}'"
                 }
         else:
-            # 重置所有实例
+            # Reset all instances
             hyperrag_instances = {}
             return {"success": True, "message": "All HyperRAG instances reset successfully"}
             
     except Exception as e:
         return {"success": False, "message": f"Failed to reset: {str(e)}"}
 
-# 文件管理相关的API接口
+# File management API endpoints
 
 class FileEmbedRequest(BaseModel):
     file_ids: List[str]
@@ -720,49 +850,49 @@ class FileEmbedRequest(BaseModel):
 @app.get("/files")
 async def get_files():
     """
-    获取所有上传的文件列表
+    Get list of all uploaded files
     """
     try:
         files = file_manager.get_all_files()
         return {"files": files}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取文件列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get file list: {str(e)}")
 
 @app.post("/files/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
     """
-    上传文件接口
+    Upload files endpoint
     """
     print(f"\n{'='*50}")
-    print(f"开始文件上传，文件数量: {len(files)}")
+    print(f"[INFO] Starting file upload, file count: {len(files)}")
     print(f"{'='*50}")
     
     results = []
     
     for i, file in enumerate(files):
         try:
-            print(f"\n上传文件 {i+1}/{len(files)}: {file.filename}")
-            print(f"文件大小: {file.size if hasattr(file, 'size') else '未知'} bytes")
+            print(f"\n[INFO] Uploading file {i+1}/{len(files)}: {file.filename}")
+            print(f"[INFO] File size: {file.size if hasattr(file, 'size') else 'unknown'} bytes")
             
-            # 读取文件内容
-            print("正在读取文件内容...")
+            # Read file content
+            print("[INFO] Reading file content...")
             content = await file.read()
-            print(f"✅ 文件内容读取完成，实际大小: {len(content)} bytes")
+            print(f"[OK] File content read complete, size: {len(content)} bytes")
             
-            # 保存文件
-            print("正在保存文件到本地...")
+            # Save file
+            print("[INFO] Saving file locally...")
             file_info = await file_manager.save_uploaded_file(content, file.filename)
             file_info["status"] = "uploaded"
-            print(f"✅ 文件保存成功: {file_info['filename']}")
-            print(f"  - 文件ID: {file_info['file_id']}")
-            print(f"  - 保存路径: {file_info['file_path']}")
-            print(f"  - 数据库: {file_info['database_name']}")
+            print(f"[OK] File saved successfully: {file_info['filename']}")
+            print(f"  - File ID: {file_info['file_id']}")
+            print(f"  - Storage path: {file_info['file_path']}")
+            print(f"  - Database: {file_info['database_name']}")
             
             results.append(file_info)
             
         except Exception as e:
-            error_msg = f"文件上传失败: {file.filename}, 错误: {str(e)}"
-            print(f"❌ {error_msg}")
+            error_msg = f"File upload failed: {file.filename}, error: {str(e)}"
+            print(f"[ERROR] {error_msg}")
             main_logger.error(error_msg)
             results.append({
                 "filename": file.filename,
@@ -770,7 +900,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 "error": str(e)
             })
     
-    print(f"\n文件上传完成，成功: {len([r for r in results if r.get('status') == 'uploaded'])}/{len(files)}")
+    print(f"\n[OK] File upload completed, successful: {len([r for r in results if r.get('status') == 'uploaded'])}/{len(files)}")
     print(f"{'='*50}")
     
     return {"files": results}
@@ -778,28 +908,28 @@ async def upload_files(files: List[UploadFile] = File(...)):
 @app.delete("/files/{file_id}")
 async def delete_file(file_id: str):
     """
-    删除指定的文件
+    Delete specified file
     """
     try:
         success = file_manager.delete_file(file_id)
         if success:
-            return {"success": True, "message": "文件删除成功"}
+            return {"success": True, "message": "File deleted successfully"}
         else:
-            raise HTTPException(status_code=404, detail="文件不存在")
+            raise HTTPException(status_code=404, detail="File does not exist")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文件删除失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
 
 @app.post("/files/embed")
 async def embed_files(request: FileEmbedRequest):
     """
-    批量嵌入文档到HyperRAG
+    Batch embed documents into HyperRAG
     """
     if not HYPERRAG_AVAILABLE:
         raise HTTPException(status_code=500, detail="HyperRAG is not available")
     
     print(f"\n{'='*50}")
-    print(f"开始文档嵌入，文件数量: {len(request.file_ids)}")
-    print(f"配置参数: chunk_size={request.chunk_size}, chunk_overlap={request.chunk_overlap}")
+    print(f"[INFO] Starting document embedding, file count: {len(request.file_ids)}")
+    print(f"[INFO] Config parameters: chunk_size={request.chunk_size}, chunk_overlap={request.chunk_overlap}")
     print(f"{'='*50}")
     
     results = []
@@ -807,43 +937,43 @@ async def embed_files(request: FileEmbedRequest):
     try:
         for i, file_id in enumerate(request.file_ids):
             try:
-                print(f"\n处理文件 {i+1}/{len(request.file_ids)}: {file_id}")
+                print(f"\n[INFO] Processing file {i+1}/{len(request.file_ids)}: {file_id}")
                 
-                # 更新文件状态为处理中
-                print("更新文件状态为处理中...")
+                # Update file status to processing
+                print("[INFO] Updating file status to processing...")
                 file_manager.update_file_status(file_id, "processing")
                 
-                # 获取文件信息
-                print("获取文件信息...")
+                # Get file info
+                print("[INFO] Getting file info...")
                 file_info = file_manager.get_file_by_id(file_id)
                 if not file_info:
-                    error_msg = f"文件不存在: {file_id}"
-                    print(f"❌ {error_msg}")
+                    error_msg = f"File does not exist: {file_id}"
+                    print(f"[ERROR] {error_msg}")
                     results.append({
                         "file_id": file_id,
                         "status": "error",
-                        "error": "文件不存在"
+                        "error": "File does not exist"
                     })
                     continue
                 
-                print(f"✅ 文件信息: {file_info['filename']} ({file_info['file_size']} bytes)")
+                print(f"[OK] File info: {file_info['filename']} ({file_info['file_size']} bytes)")
                 
-                # 使用文件对应的数据库名
+                # Use database name corresponding to file
                 database_name = file_info["database_name"]
-                print(f"目标数据库: {database_name}")
+                print(f"[INFO] Target database: {database_name}")
                 rag = get_or_create_hyperrag(database_name)
                 
-                # 读取文件内容
-                print("读取文件内容...")
+                # Read file content
+                print("[INFO] Reading file content...")
                 content = await file_manager.read_file_content(file_info["file_path"])
-                print(f"✅ 内容长度: {len(content)} 字符")
+                print(f"[OK] Content length: {len(content)} characters")
                 
-                # 插入到HyperRAG
-                print("开始文档嵌入...")
+                # Insert into HyperRAG
+                print("[INFO] Starting document embedding...")
                 await rag.ainsert(content)
-                print("✅ 文档嵌入完成")
+                print("[OK] Document embedding complete")
                 
-                # 更新文件状态为已嵌入
+                # Update file status to embedded
                 file_manager.update_file_status(file_id, "embedded")
                 
                 results.append({
@@ -853,12 +983,12 @@ async def embed_files(request: FileEmbedRequest):
                     "status": "embedded"
                 })
                 
-                print(f"✅ 文件 {file_info['filename']} 嵌入成功")
+                print(f"[OK] File {file_info['filename']} embedded successfully")
                 
             except Exception as e:
-                # 更新文件状态为错误
-                error_msg = f"文件嵌入失败: {file_id}, 错误: {str(e)}"
-                print(f"❌ {error_msg}")
+                # Update file status to error
+                error_msg = f"File embedding failed: {file_id}, error: {str(e)}"
+                print(f"[ERROR] {error_msg}")
                 file_manager.update_file_status(file_id, "error", str(e))
                 
                 results.append({
@@ -868,17 +998,17 @@ async def embed_files(request: FileEmbedRequest):
                 })
         
         successful = len([r for r in results if r.get('status') == 'embedded'])
-        print(f"\n文档嵌入完成，成功: {successful}/{len(request.file_ids)}")
+        print(f"\n[OK] Document embedding complete, successful: {successful}/{len(request.file_ids)}")
         print(f"{'='*50}")
         
         return {"embedded_files": results}
         
     except Exception as e:
-        error_msg = f"批量嵌入失败: {str(e)}"
-        print(f"❌ {error_msg}")
+        error_msg = f"Batch embedding failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
 
-# 自定义日志处理器，将日志通过WebSocket发送
+# Custom log handler sending logs over WebSocket
 class WebSocketLogHandler(logging.Handler):
     def __init__(self, connection_manager):
         super().__init__()
@@ -887,7 +1017,7 @@ class WebSocketLogHandler(logging.Handler):
     def emit(self, record):
         try:
             log_message = self.format(record)
-            # 异步发送日志消息
+            # Send log message asynchronously
             asyncio.create_task(self.connection_manager.send_log_message({
                 "type": "log",
                 "level": record.levelname,
@@ -896,9 +1026,9 @@ class WebSocketLogHandler(logging.Handler):
                 "logger_name": record.name
             }))
         except Exception:
-            pass  # 避免日志处理器自身错误影响主程序
+            pass  # Avoid log handler errors affecting main program
 
-# 自定义流处理器，捕获print语句和其他输出
+# Custom stream handler capturing stdout/stderr
 class WebSocketStreamHandler:
     def __init__(self, connection_manager, stream_type="stdout"):
         self.connection_manager = connection_manager
@@ -906,11 +1036,11 @@ class WebSocketStreamHandler:
         self.original_stream = sys.stdout if stream_type == "stdout" else sys.stderr
         
     def write(self, message):
-        # 同时写入原始流
+        # Also write to original stream
         self.original_stream.write(message)
         self.original_stream.flush()
         
-        # 发送到WebSocket（去除空行）
+        # Send to WebSocket (strip empty lines)
         if message.strip():
             asyncio.create_task(self.connection_manager.send_log_message({
                 "type": "console",
@@ -923,7 +1053,7 @@ class WebSocketStreamHandler:
     def flush(self):
         self.original_stream.flush()
 
-# WebSocket连接管理
+# WebSocket connection management
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -935,7 +1065,7 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections.append(websocket)
         
-        # 如果是第一个连接，启用日志重定向
+        # If first connection, enable logging redirect
         if len(self.active_connections) == 1 and not self.logging_enabled:
             self.enable_logging_redirect()
 
@@ -943,30 +1073,30 @@ class ConnectionManager:
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         
-        # 如果没有连接了，禁用日志重定向
+        # If no connections remain, disable logging redirect
         if len(self.active_connections) == 0 and self.logging_enabled:
             self.disable_logging_redirect()
 
     def enable_logging_redirect(self):
-        """启用日志重定向"""
+        """Enable logging redirect."""
         if not self.logging_enabled:
             self.original_stdout = sys.stdout
             self.original_stderr = sys.stderr
             
-            # 重定向标准输出和错误输出
+            # Redirect stdout and stderr
             sys.stdout = WebSocketStreamHandler(self, "stdout")
             sys.stderr = WebSocketStreamHandler(self, "stderr")
             
             self.logging_enabled = True
-            print("日志重定向已启用")
+            print("[INFO] Logging redirect enabled")
 
     def disable_logging_redirect(self):
-        """禁用日志重定向"""
+        """Disable logging redirect."""
         if self.logging_enabled and self.original_stdout and self.original_stderr:
             sys.stdout = self.original_stdout
             sys.stderr = self.original_stderr
             self.logging_enabled = False
-            print("日志重定向已禁用")
+            print("[INFO] Logging redirect disabled")
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
@@ -977,58 +1107,58 @@ class ConnectionManager:
             try:
                 await connection.send_text(message)
             except Exception:
-                # 如果连接已断开，标记为移除
+                # If disconnected, mark for removal
                 disconnected.append(connection)
         
-        # 移除断开的连接
+        # Remove disconnected connections
         for conn in disconnected:
             self.disconnect(conn)
 
     async def send_progress_update(self, progress_data: dict):
-        """发送进度更新到所有连接的客户端"""
+        """Send progress update to all connected clients."""
         message = json.dumps(progress_data)
         await self.broadcast(message)
     
     async def send_log_message(self, log_data: dict):
-        """发送日志消息到所有连接的客户端"""
+        """Send log message to all connected clients."""
         message = json.dumps(log_data)
         await self.broadcast(message)
 
 manager = ConnectionManager()
 
-# 设置全面的日志配置
+# Set up comprehensive logging configuration
 def setup_comprehensive_logging():
-    """设置全面的日志配置"""
-    # 设置根日志记录器
+    """Set up comprehensive logging configuration."""
+    # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
     
-    # 清除现有的处理器
+    # Clear existing handlers
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
     
-    # 创建WebSocket处理器
+    # Create WebSocket handler
     ws_handler = WebSocketLogHandler(manager)
     ws_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     ws_handler.setFormatter(formatter)
     
-    # 创建控制台处理器（保留控制台输出）
+    # Create console handler (preserve console output)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
     
-    # 添加处理器到根日志记录器
+    # Add handlers to root logger
     root_logger.addHandler(ws_handler)
     root_logger.addHandler(console_handler)
     
-    # 设置特定模块的日志级别
+    # Set log level for specific modules
     logging.getLogger('hyperrag').setLevel(logging.INFO)
     logging.getLogger('openai').setLevel(logging.INFO)
-    logging.getLogger('httpx').setLevel(logging.WARNING)  # 减少HTTP请求日志
+    logging.getLogger('httpx').setLevel(logging.WARNING)  # Reduce HTTP request logs
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     
-    # 确保HyperRAG相关的所有子模块都能输出日志
+    # Ensure all HyperRAG submodules emit logs
     hyperrag_modules = [
         'hyperrag.base',
         'hyperrag.hyperrag', 
@@ -1042,17 +1172,17 @@ def setup_comprehensive_logging():
     for module_name in hyperrag_modules:
         module_logger = logging.getLogger(module_name)
         module_logger.setLevel(logging.INFO)
-        # 确保模块日志也会传播到根记录器
+        # Ensure module logs propagate to root logger
         module_logger.propagate = True
     
     return root_logger
 
 def configure_hyperrag_logging():
-    """配置HyperRAG相关的详细日志输出"""
+    """Configure HyperRAG detailed logging output."""
     try:
-        # 如果HyperRAG可用，配置其内部日志
+        # If HyperRAG available, configure internal logging
         if HYPERRAG_AVAILABLE:
-            # 导入HyperRAG相关模块并设置日志
+            # Import HyperRAG modules and configure loggers
             try:
                 import hyperrag
                 import hyperrag.base
@@ -1060,7 +1190,7 @@ def configure_hyperrag_logging():
                 import hyperrag.llm
                 import hyperrag.utils
                 
-                # 为HyperRAG的主要模块设置日志记录器
+                # Configure loggers for primary HyperRAG modules
                 modules_to_configure = [
                     hyperrag,
                     hyperrag.base,
@@ -1075,18 +1205,18 @@ def configure_hyperrag_logging():
                         logger.setLevel(logging.INFO)
                         logger.propagate = True
                         
-                print("✅ HyperRAG日志配置完成")
+                print("[INFO] HyperRAG logging configured successfully")
                         
             except ImportError as e:
-                print(f"⚠️  无法导入HyperRAG模块进行日志配置: {e}")
+                print(f"[WARN] Failed to import HyperRAG modules for logging configuration: {e}")
                 
     except Exception as e:
-        print(f"⚠️  HyperRAG日志配置失败: {e}")
+        print(f"[WARN] HyperRAG logging configuration failed: {e}")
 
-# 初始化日志系统
+# Initialize logging system
 main_logger = setup_comprehensive_logging()
 
-# 配置HyperRAG日志
+# Configure HyperRAG logging
 configure_hyperrag_logging()
 
 @app.websocket("/ws")
@@ -1095,43 +1225,43 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # 这里可以处理客户端发送的消息
+            # Handle client-sent messages here
             await manager.send_personal_message(f"Message received: {data}", websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-# 带实时进度通知的文档嵌入接口
+# Document embedding endpoint with real-time progress
 @app.post("/files/embed-with-progress")
 async def embed_files_with_progress(request: FileEmbedRequest):
     """
-    批量嵌入文档到HyperRAG，带实时进度通知
+    Batch embed documents into HyperRAG with real-time progress notification
     """
     if not HYPERRAG_AVAILABLE:
         raise HTTPException(status_code=500, detail="HyperRAG is not available")
     
-    # 立即返回处理开始的响应
+    # Return initial response immediately
     total_files = len(request.file_ids)
     
-    # 异步处理文件嵌入
+    # Process document embedding asynchronously
     asyncio.create_task(process_files_with_progress(request, total_files))
     
     return {
-        "message": "文档嵌入处理已开始",
+        "message": "Document embedding processing started",
         "total_files": total_files,
         "processing": True
     }
 
 async def process_files_with_progress(request: FileEmbedRequest, total_files: int):
-    """异步处理文件嵌入并发送进度更新"""
+    """Asynchronously process file embedding and emit progress updates."""
     try:
         print(f"="*60)
-        print(f"开始批量文件嵌入任务")
-        print(f"文件总数: {total_files}")
-        print(f"配置参数: chunk_size={request.chunk_size}, chunk_overlap={request.chunk_overlap}")
+        print(f"[INFO] Starting batch document embedding task")
+        print(f"[INFO] Total files: {total_files}")
+        print(f"[INFO] Config parameters: chunk_size={request.chunk_size}, chunk_overlap={request.chunk_overlap}")
         print(f"="*60)
         
-        main_logger.info(f"开始处理 {total_files} 个文件的嵌入任务")
-        main_logger.info(f"配置参数: chunk_size={request.chunk_size}, chunk_overlap={request.chunk_overlap}")
+        main_logger.info(f"Starting batch embedding for {total_files} files")
+        main_logger.info(f"Config parameters: chunk_size={request.chunk_size}, chunk_overlap={request.chunk_overlap}")
         
         successful_files = 0
         failed_files = 0
@@ -1139,11 +1269,11 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
         for i, file_id in enumerate(request.file_ids):
             try:
                 print(f"\n{'='*40}")
-                print(f"处理文件 {i + 1}/{total_files}")
-                print(f"文件ID: {file_id}")
+                print(f"[INFO] Processing file {i + 1}/{total_files}")
+                print(f"[INFO] File ID: {file_id}")
                 print(f"{'='*40}")
                 
-                # 发送进度更新
+                # Send progress update
                 await manager.send_progress_update({
                     "type": "progress",
                     "file_id": file_id,
@@ -1151,116 +1281,116 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
                     "total": total_files,
                     "percentage": ((i + 1) / total_files) * 100,
                     "status": "processing",
-                    "message": f"正在处理文件 {i + 1}/{total_files}"
+                    "message": f"Processing file {i + 1}/{total_files}"
                 })
                 
-                # 更新文件状态为处理中
-                print("更新文件状态为处理中...")
+                # Update file status to processing
+                print("[INFO] Updating file status to processing...")
                 file_manager.update_file_status(file_id, "processing")
                 
-                # 获取文件信息
-                print("正在获取文件信息...")
-                main_logger.info(f"获取文件信息: {file_id}")
+                # Get file info
+                print("[INFO] Getting file info...")
+                main_logger.info(f"Getting file info: {file_id}")
                 file_info = file_manager.get_file_by_id(file_id)
                 if not file_info:
-                    error_msg = f"文件不存在: {file_id}"
-                    print(f"❌ 错误: {error_msg}")
+                    error_msg = f"File does not exist: {file_id}"
+                    print(f"[ERROR] {error_msg}")
                     main_logger.error(error_msg)
                     await manager.send_progress_update({
                         "type": "error",
                         "file_id": file_id,
-                        "error": "文件不存在",
+                        "error": "File does not exist",
                         "current": i + 1,
                         "total": total_files
                     })
                     failed_files += 1
                     continue
                 
-                print(f"✅ 文件信息获取成功:")
-                print(f"  - 文件名: {file_info['filename']}")
-                print(f"  - 文件大小: {file_info['file_size']} bytes")
-                print(f"  - 上传时间: {file_info['upload_time']}")
+                print(f"[OK] File info retrieved successfully:")
+                print(f"  - Filename: {file_info['filename']}")
+                print(f"  - File size: {file_info['file_size']} bytes")
+                print(f"  - Upload time: {file_info['upload_time']}")
                 
-                # 使用文件对应的数据库名
+                # Use database name corresponding to file
                 database_name = file_info["database_name"]
-                print(f"  - 目标数据库: {database_name}")
+                print(f"  - Target database: {database_name}")
                 
-                main_logger.info(f"开始处理文件: {file_info['filename']} ({file_info['file_size']} bytes)，使用数据库: {database_name}")
+                main_logger.info(f"Processing file: {file_info['filename']} ({file_info['file_size']} bytes), database: {database_name}")
                 
-                # 为每个文件初始化对应的HyperRAG实例
-                print("正在初始化 HyperRAG 实例...")
-                main_logger.info(f"正在初始化 HyperRAG 实例，数据库: {database_name}")
+                # Initialize HyperRAG instance for each file
+                print("[INFO] Initializing HyperRAG instance...")
+                main_logger.info(f"Initializing HyperRAG instance, database: {database_name}")
                 rag = get_or_create_hyperrag(database_name)
-                print("✅ HyperRAG 实例初始化完成")
-                main_logger.info(f"HyperRAG 实例初始化完成，使用数据库: {database_name}")
+                print("[OK] HyperRAG instance initialized successfully")
+                main_logger.info(f"HyperRAG instance initialized successfully, using database: {database_name}")
                 
-                # 发送详细进度信息
+                # Send detailed progress info
                 await manager.send_progress_update({
                     "type": "file_processing",
                     "file_id": file_id,
                     "filename": file_info["filename"],
                     "database_name": database_name,
                     "stage": "reading",
-                    "message": f"正在读取文件: {file_info['filename']} (数据库: {database_name})"
+                    "message": f"Reading file: {file_info['filename']} (database: {database_name})"
                 })
                 
-                # 读取文件内容
-                print("正在读取文件内容...")
-                main_logger.info(f"开始读取文件内容: {file_info['filename']}")
+                # Read file content
+                print("[INFO] Reading file content...")
+                main_logger.info(f"Reading file content: {file_info['filename']}")
                 content = await file_manager.read_file_content(file_info["file_path"])
-                print(f"✅ 文件读取完成，内容长度: {len(content)} 字符")
-                main_logger.info(f"文件读取完成，内容长度: {len(content)} 字符")
+                print(f"[OK] File read complete, content length: {len(content)} characters")
+                main_logger.info(f"File read complete, content length: {len(content)} characters")
                 
-                # 显示内容预览
+                # Show content preview
                 preview = content[:200] + "..." if len(content) > 200 else content
-                print(f"内容预览: {preview}")
+                print(f"[INFO] Content preview: {preview}")
                 
-                # 发送嵌入阶段的进度
+                # Send embedding phase progress
                 await manager.send_progress_update({
                     "type": "file_processing",
                     "file_id": file_id,
                     "filename": file_info["filename"],
                     "database_name": database_name,
                     "stage": "embedding",
-                    "message": f"正在嵌入文档: {file_info['filename']} (数据库: {database_name})"
+                    "message": f"Embedding document: {file_info['filename']} (database: {database_name})"
                 })
                 
-                # 插入到HyperRAG
-                print("开始文档嵌入处理...")
-                print("这个过程可能需要一些时间，请耐心等待...")
-                main_logger.info(f"开始文档嵌入处理: {file_info['filename']}，数据库: {database_name}")
-                main_logger.info("正在进行文档分块...")
+                # Insert into HyperRAG
+                print("[INFO] Starting document embedding process...")
+                print("[INFO] This process may take some time, please wait...")
+                main_logger.info(f"Starting document embedding: {file_info['filename']}, database: {database_name}")
+                main_logger.info("Chunking document...")
                 
-                # 这里会触发HyperRAG的详细处理过程
+                # Triggers HyperRAG detailed processing
                 await rag.ainsert(content)
                 
-                print("✅ 文档嵌入完成！")
-                main_logger.info(f"文档嵌入完成: {file_info['filename']}，数据库: {database_name}")
+                print("[OK] Document embedding complete!")
+                main_logger.info(f"Document embedding complete: {file_info['filename']}, database: {database_name}")
                 
-                # 更新文件状态为已嵌入
+                # Update file status to embedded
                 file_manager.update_file_status(file_id, "embedded")
                 
-                # 发送成功完成的进度更新
+                # Send success progress update
                 await manager.send_progress_update({
                     "type": "file_completed",
                     "file_id": file_id,
                     "filename": file_info["filename"],
                     "database_name": database_name,
                     "status": "completed",
-                    "message": f"文件嵌入完成: {file_info['filename']} (数据库: {database_name})"
+                    "message": f"Document embedding complete: {file_info['filename']} (database: {database_name})"
                 })
                 
                 successful_files += 1
-                print(f"✅ 文件 {file_info['filename']} 处理成功！")
+                print(f"[OK] File {file_info['filename']} processed successfully!")
                 
             except Exception as e:
-                # 更新文件状态为错误
-                error_msg = f"文件处理失败: {file_id}, 错误: {str(e)}"
-                print(f"❌ {error_msg}")
+                # Update file status to error
+                error_msg = f"File processing failed: {file_id}, error: {str(e)}"
+                print(f"[ERROR] {error_msg}")
                 main_logger.error(error_msg)
                 file_manager.update_file_status(file_id, "error", str(e))
                 
-                # 发送错误进度更新
+                # Send error progress update
                 await manager.send_progress_update({
                     "type": "file_error",
                     "file_id": file_id,
@@ -1271,28 +1401,28 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
                 
                 failed_files += 1
         
-        # 发送整体完成的进度更新
+        # Send overall completion progress update
         print(f"\n{'='*60}")
-        print(f"批量文档处理完成！")
-        print(f"总文件数: {total_files}")
-        print(f"成功处理: {successful_files}")
-        print(f"处理失败: {failed_files}")
-        print(f"成功率: {(successful_files/total_files)*100:.1f}%")
+        print("[SUCCESS] Batch document processing complete!")
+        print(f"Total files: {total_files}")
+        print(f"Successfully processed: {successful_files}")
+        print(f"Failed: {failed_files}")
+        print(f"Success rate: {(successful_files/total_files)*100:.1f}%")
         print(f"{'='*60}")
         
-        main_logger.info(f"所有文档处理完成！总计: {total_files} 个文件，成功: {successful_files}，失败: {failed_files}")
+        main_logger.info(f"All documents processed! Total: {total_files}, success: {successful_files}, failed: {failed_files}")
         await manager.send_progress_update({
             "type": "all_completed",
-            "message": f"所有文档处理完成 (成功: {successful_files}, 失败: {failed_files})",
+            "message": f"All documents processed (success: {successful_files}, failed: {failed_files})",
             "total_files": total_files,
             "successful_files": successful_files,
             "failed_files": failed_files
         })
         
     except Exception as e:
-        # 发送整体错误信息
-        error_msg = f"批量嵌入失败: {str(e)}"
-        print(f"❌ {error_msg}")
+        # Send overall error message
+        error_msg = f"Batch embedding failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
         main_logger.error(error_msg)
         await manager.send_progress_update({
             "type": "error",

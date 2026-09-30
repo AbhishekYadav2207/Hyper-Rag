@@ -7,12 +7,12 @@ class ErrorBoundary extends Component {
     }
 
     static getDerivedStateFromError(error) {
-        // 更新 state 使下一次渲染能够显示降级后的 UI
+        // Update state so the next render will show the fallback UI
         return { hasError: true };
     }
 
     componentDidCatch(error, errorInfo) {
-        // 你也可以将错误日志上报给服务器
+        // You can also log error reports to the server
         console.error("ErrorBoundary caught an error:", error, errorInfo);
         this.setState({
             hasError: true,
@@ -23,7 +23,7 @@ class ErrorBoundary extends Component {
 
     render() {
         if (this.state.hasError) {
-            // 你可以自定义降级后的 UI 并渲染
+            // You can render any custom fallback UI
             return (
                 <div />
             );

@@ -1,18 +1,19 @@
-## 安装依赖
+## Install Dependencies
 
 ```bash
 pnpm install
 ```
 
-## 脚本描述
+## Scripts
 
-### 开发启动
+### Development Startup
+
 ```bash
-# mock模式启动
+# Start dev server
 npm run dev
 ```
 
-### 打包
+### Production Build
 
 ```bash
 npm run build

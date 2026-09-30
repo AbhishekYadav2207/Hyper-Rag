@@ -22,7 +22,7 @@ const RetrievalInfo = ({
   const [activeKey, setActiveKey] = useState([])
   const { t } = useTranslation()
 
-  // 如果没有任何检索信息，不渲染组件
+  // If there is no retrieval information, do not render component
   if (!entities.length && !hyperedges.length && !textUnits.length) {
     return null
   }
@@ -157,7 +157,7 @@ const RetrievalInfo = ({
 
   const panelItems = []
 
-  // 超边面板
+  // Hyperedges panel
   if (hyperedges.length > 0) {
     panelItems.push({
       key: 'hyperedges',
@@ -178,7 +178,7 @@ const RetrievalInfo = ({
     })
   }
 
-  // 实体面板
+  // Entities panel
   if (entities.length > 0) {
     panelItems.push({
       key: 'entities',
@@ -193,7 +193,7 @@ const RetrievalInfo = ({
     })
   }
 
-  // 文档片段面板
+  // Document chunks panel
   if (textUnits.length > 0) {
     panelItems.push({
       key: 'textUnits',

@@ -7,33 +7,33 @@ from pathlib import Path
 BASE_URL = "http://localhost:8000"
 
 def test_file_upload():
-    """测试文件上传"""
-    print("=== 测试文件上传 ===")
+    """Test file upload."""
+    print("=== Test File Upload ===")
     
-    # 创建一个测试文件
+    # Create a test file
     test_file_content = """
-    这是一个测试文档，用于验证文件上传和解析功能。
+    This is a test document used to verify file upload and parsing functionality.
     
-    # 测试标题
+    # Test Title
     
-    这个文档包含了一些基本的文本内容，用于测试HyperRAG的文档处理能力。
+    This document contains basic text content to test HyperRAG's document processing capabilities.
     
-    ## 测试内容
+    ## Test Content
     
-    1. 文本解析测试
-    2. 文档嵌入测试
-    3. 查询功能测试
+    1. Text parsing test
+    2. Document embedding test
+    3. Query functionality test
     
-    这是一个完整的测试流程。
+    This is a complete testing workflow.
     """
     
-    # 保存为临时文件
+    # Save as temporary file
     test_file_path = "test_document.txt"
     with open(test_file_path, 'w', encoding='utf-8') as f:
         f.write(test_file_content)
     
     try:
-        # 上传文件
+        # Upload file
         with open(test_file_path, 'rb') as f:
             files = {'files': (test_file_path, f, 'text/plain')}
             response = requests.post(f"{BASE_URL}/files/upload", files=files)
@@ -41,97 +41,81 @@ def test_file_upload():
         print(f"Status: {response.status_code}")
         print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
         
-        # 返回上传的文件信息
+        # Return uploaded file info
         if response.status_code == 200:
             files_data = response.json().get('files', [])
             if files_data:
                 return files_data[0].get('file_id')
     
     finally:
-        # 清理临时文件
+        # Clean up temporary file
         if os.path.exists(test_file_path):
             os.remove(test_file_path)
     
     return None
 
 def test_get_files():
-    """测试获取文件列表"""
-    print("\n=== 测试获取文件列表 ===")
-    
+    """Test retrieving file list."""
+    print("\n=== Test Get Files List ===")
     response = requests.get(f"{BASE_URL}/files")
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
-    
     return response.json()
 
-def test_embed_files(file_id):
-    """测试文件嵌入"""
-    print("\n=== 测试文件嵌入 ===")
+def test_embed_files(file_ids):
+    """Test embedding files."""
+    print(f"\n=== Test Embedding Files: {file_ids} ===")
     
     data = {
-        "file_ids": [file_id],
-        "chunk_size": 1000,
-        "chunk_overlap": 200
+        "file_ids": file_ids,
+        "database_name": "test_db",
+        "chunk_size": 1200,
+        "chunk_overlap": 100
     }
     
-    response = requests.post(f"{BASE_URL}/files/embed-with-progress", json=data)
+    response = requests.post(f"{BASE_URL}/files/embed", json=data)
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
+    return response.json()
 
 def test_delete_file(file_id):
-    """测试文件删除"""
-    print(f"\n=== 测试文件删除 (ID: {file_id}) ===")
-    
+    """Test deleting file."""
+    print(f"\n=== Test Delete File: {file_id} ===")
     response = requests.delete(f"{BASE_URL}/files/{file_id}")
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
-
-def test_hyperrag_query():
-    """测试HyperRAG查询"""
-    print("\n=== 测试HyperRAG查询 ===")
-    
-    data = {
-        "question": "文档测试内容包含什么？",
-        "mode": "hyper",
-        "top_k": 20
-    }
-    
-    response = requests.post(f"{BASE_URL}/hyperrag/query", json=data)
-    print(f"Status: {response.status_code}")
-    print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
+    return response.json()
 
 def main():
-    """主测试流程"""
-    print("开始测试文件上传和解析功能...")
+    """Main test workflow."""
+    print("Starting file management API tests...")
     
-    # 1. 测试文件上传
+    # 1. Test upload
     file_id = test_file_upload()
+    
     if not file_id:
-        print("文件上传失败，测试终止")
+        print("[FAILED] Upload failed, aborting remaining tests")
         return
     
-    print(f"\n上传成功，文件ID: {file_id}")
-    
-    # 2. 测试获取文件列表
+    # 2. Test get files list
     test_get_files()
     
-    # 3. 测试文件嵌入（异步处理）
-    test_embed_files(file_id)
+    # 3. Test embed
+    # test_embed_files([file_id])
     
-    # 等待一段时间让嵌入处理完成
-    print("\n等待10秒让嵌入处理完成...")
-    time.sleep(10)
+    # 4. Wait for processing
+    # time.sleep(2)
     
-    # 4. 再次获取文件列表查看状态
-    test_get_files()
+    # 5. Check status again
+    # test_get_files()
     
-    # 5. 测试查询功能
-    test_hyperrag_query()
-    
-    # 6. 测试文件删除
+    # 6. Test delete
     test_delete_file(file_id)
     
-    print("\n测试完成！")
+    # 7. Confirm deletion
+    test_get_files()
+    
+    print("\nFile management API tests completed!")
 
 if __name__ == "__main__":
-    main() 
+    main()

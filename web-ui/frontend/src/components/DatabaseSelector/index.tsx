@@ -10,26 +10,26 @@ const { Text } = Typography;
 const { Option } = Select;
 
 interface DatabaseSelectorProps {
-  /** 显示模式：选择器/按钮组/紧凑模式 */
+  /** Display mode: selector / button group / compact */
   mode?: 'select' | 'buttons' | 'compact';
-  /** 是否显示当前数据库信息 */
+  /** Whether to show current database info */
   showCurrent?: boolean;
-  /** 是否显示刷新按钮 */
+  /** Whether to show refresh button */
   showRefresh?: boolean;
-  /** 选择器占位文本 */
+  /** Selector placeholder text */
   placeholder?: string;
-  /** 自定义样式 */
+  /** Custom styles */
   style?: React.CSSProperties;
-  /** 组件大小 */
+  /** Component size */
   size?: SizeType;
-  /** 数据库变更回调 */
+  /** Database change callback */
   onChange?: (value: string) => void;
-  /** 是否禁用 */
+  /** Whether disabled */
   disabled?: boolean;
 }
 
 /**
- * 数据库选择组件
+ * Database selector component
  */
 const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
     mode = 'select',
@@ -42,11 +42,11 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
     disabled = false
 }) => {
     const { t } = useTranslation();
-    
-    // 如果没有提供placeholder，使用默认的国际化文本
+
+    // If placeholder not provided, use default i18n text
     const defaultPlaceholder = placeholder || t('database.select_database_placeholder');
 
-    // 初始化数据库列表
+    // Initialize database list
     useEffect(() => {
         if (!storeGlobalUser.selectedDatabase) {
             storeGlobalUser.restoreSelectedDatabase();
@@ -56,13 +56,13 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
         }
     }, []);
 
-    // 处理数据库变更
+    // Handle database change
     const handleDatabaseChange = (value) => {
         storeGlobalUser.setSelectedDatabase(value);
         onChange?.(value);
     };
 
-    // 刷新数据库列表
+    // Refresh database list
     const handleRefresh = async () => {
         try {
             await storeGlobalUser.loadDatabases();
@@ -72,7 +72,7 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
         }
     };
 
-    // 选择器模式
+    // Selector mode
     const renderSelectMode = () => (
         <Space size="middle" style={style}>
             <Select
@@ -95,7 +95,7 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
                                     onClick={handleRefresh}
                                     style={{ width: '100%' }}
                                 >
-                                    刷新列表
+                                    Refresh List
                                 </Button>
                             </div>
                         )}
@@ -126,7 +126,7 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
         </Space>
     );
 
-    // 按钮组模式
+    // Button group mode
     const renderButtonsMode = () => (
         <Space size="small" style={style}>
             {storeGlobalUser.availableDatabases.map((db) => (
@@ -144,7 +144,7 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
                     }}
                     className='py-5 px-3'
                 >
-                    {db.description.replace('超图', '')}
+                    {db.description.replace('Hypergraph', '').replace('Hyper-Graph', '')}
                 </Button>
             ))}
             {showRefresh && (
@@ -159,7 +159,7 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
         </Space>
     );
 
-    // 紧凑模式
+    // Compact mode
     const renderCompactMode = () => (
         <Space size="small" style={style}>
             <Select
@@ -181,17 +181,17 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
         </Space>
     );
 
-    // 加载状态
+    // Loading state
     if (storeGlobalUser.availableDatabases.length === 0) {
         return (
             <Space style={style}>
                 <Spin size="small" />
-                <Text type="secondary">加载数据库列表...</Text>
+                <Text type="secondary">Loading database list...</Text>
             </Space>
         );
     }
 
-    // 根据模式渲染不同的UI
+    // Render UI according to mode
     switch (mode) {
         case 'buttons':
             return renderButtonsMode();

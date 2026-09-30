@@ -10,58 +10,54 @@ BASE_URL = "http://localhost:8000"
 WS_URL = "ws://localhost:8000/ws"
 
 async def test_websocket_logs():
-    """测试WebSocket日志功能"""
-    print("=== 测试WebSocket日志功能 ===")
+    """Test WebSocket logging functionality."""
+    print("=== Test WebSocket Logging ===")
     
     try:
-        # 连接WebSocket
         async with websockets.connect(WS_URL) as websocket:
-            print("✅ WebSocket连接成功")
+            print("[OK] WebSocket connected successfully")
             
-            # 创建测试文件
             test_content = """
-            这是一个测试文档，用于验证WebSocket日志功能。
+            This is a test document used to verify WebSocket logging functionality.
             
-            # HyperRAG 日志测试
+            # HyperRAG Logging Test
             
-            本文档将被上传并嵌入到HyperRAG系统中，期间会产生详细的处理日志。
+            This document will be uploaded and embedded into the HyperRAG system.
+            Detailed processing logs are emitted during execution.
             
-            ## 测试内容
+            ## Test Sections
             
-            1. 文档上传测试
-            2. 文件解析测试  
-            3. 文档嵌入测试
-            4. WebSocket日志传输测试
-            
-            这是完整的测试流程，用于验证实时日志显示功能。
+            1. Document upload test
+            2. Document parsing test
+            3. Document embedding test
+            4. WebSocket log transmission test
             """
             
-            # 保存为临时文件
             test_file_path = "websocket_test.txt"
             with open(test_file_path, 'w', encoding='utf-8') as f:
                 f.write(test_content)
             
             try:
-                # 1. 上传文件
-                print("\n1. 上传测试文件...")
+                # 1. Upload file
+                print("\n1. Uploading test file...")
                 with open(test_file_path, 'rb') as f:
                     files = {'files': (test_file_path, f, 'text/plain')}
                     response = requests.post(f"{BASE_URL}/files/upload", files=files)
                 
                 if response.status_code != 200:
-                    print(f"❌ 文件上传失败: {response.text}")
+                    print(f"[ERROR] File upload failed: {response.text}")
                     return
                 
                 files_data = response.json().get('files', [])
                 if not files_data:
-                    print("❌ 没有获取到上传的文件信息")
+                    print("[ERROR] No file info received from upload response")
                     return
                 
                 file_id = files_data[0].get('file_id')
-                print(f"✅ 文件上传成功，ID: {file_id}")
+                print(f"[OK] File uploaded successfully, ID: {file_id}")
                 
-                # 2. 启动嵌入并监听日志
-                print("\n2. 启动文档嵌入并监听日志...")
+                # 2. Trigger embed and listen to logs
+                print("\n2. Triggering document embedding and listening to logs...")
                 embed_data = {
                     "file_ids": [file_id],
                     "chunk_size": 500,
@@ -70,12 +66,12 @@ async def test_websocket_logs():
                 
                 response = requests.post(f"{BASE_URL}/files/embed-with-progress", json=embed_data)
                 if response.status_code != 200:
-                    print(f"❌ 嵌入启动失败: {response.text}")
+                    print(f"[ERROR] Embedding trigger failed: {response.text}")
                     return
                 
-                print("✅ 嵌入处理已启动，开始监听日志...")
+                print("[OK] Embedding initiated, listening to WebSocket stream...")
                 
-                # 3. 监听WebSocket消息
+                # 3. Listen for WebSocket messages
                 log_count = 0
                 progress_count = 0
                 
@@ -90,71 +86,70 @@ async def test_websocket_logs():
                             level = data.get('level', 'INFO')
                             log_message = data.get('message', '')
                             
-                            print(f"📝 [{level}] {log_message}")
+                            print(f"[LOG] [{level}] {log_message}")
                             
                         elif msg_type == 'progress':
                             progress_count += 1
                             current = data.get('current', 0)
                             total = data.get('total', 0)
                             percentage = data.get('percentage', 0)
-                            message = data.get('message', '')
+                            prog_message = data.get('message', '')
                             
-                            print(f"📊 进度: {current}/{total} ({percentage:.1f}%) - {message}")
+                            print(f"[PROGRESS] {current}/{total} ({percentage:.1f}%) - {prog_message}")
                             
                         elif msg_type == 'file_processing':
                             filename = data.get('filename', '')
                             stage = data.get('stage', '')
-                            message = data.get('message', '')
-                            print(f"🔄 处理: {filename} - {stage} - {message}")
+                            proc_message = data.get('message', '')
+                            print(f"[PROCESSING] {filename} - {stage} - {proc_message}")
                             
                         elif msg_type == 'file_completed':
                             filename = data.get('filename', '')
-                            print(f"✅ 完成: {filename}")
+                            print(f"[OK] Completed: {filename}")
                             
                         elif msg_type == 'all_completed':
-                            print(f"🎉 所有文档处理完成!")
+                            print("[SUCCESS] All documents processed successfully!")
                             break
                             
                         elif msg_type == 'error' or msg_type == 'file_error':
                             error = data.get('error', 'Unknown error')
-                            print(f"❌ 错误: {error}")
+                            print(f"[ERROR] {error}")
                             break
                             
                     except json.JSONDecodeError:
-                        print(f"⚠️  收到非JSON消息: {message}")
+                        print(f"[WARN] Received non-JSON message: {message}")
                 
-                print(f"\n📊 统计信息:")
-                print(f"   - 收到日志消息: {log_count} 条")
-                print(f"   - 收到进度消息: {progress_count} 条")
+                print("\n[SUMMARY] Statistics:")
+                print(f"   - Received log messages: {log_count}")
+                print(f"   - Received progress messages: {progress_count}")
                 
-                # 4. 清理测试文件
-                print("\n4. 清理测试数据...")
+                # 4. Clean up test file
+                print("\n4. Cleaning up test file...")
                 delete_response = requests.delete(f"{BASE_URL}/files/{file_id}")
                 if delete_response.status_code == 200:
-                    print("✅ 测试文件删除成功")
+                    print("[OK] Test file deleted successfully")
                 else:
-                    print(f"⚠️  测试文件删除失败: {delete_response.text}")
+                    print(f"[WARN] Test file deletion failed: {delete_response.text}")
                 
             finally:
-                # 清理本地临时文件
                 if os.path.exists(test_file_path):
                     os.remove(test_file_path)
             
     except Exception as e:
-        print(f"❌ 测试失败: {str(e)}")
+        print(f"[ERROR] Test failed: {str(e)}")
 
 def main():
-    """主函数"""
-    print("开始测试WebSocket日志功能...")
-    print("请确保后端服务已启动 (uvicorn main:app --reload)")
+    """Main function."""
+    print("Starting WebSocket logging test...")
+    print("Ensure backend service is running (uvicorn main:app --reload)")
     
     try:
         asyncio.run(test_websocket_logs())
-        print("\n🎉 WebSocket日志功能测试完成!")
+        print("\nWebSocket logging test completed!")
     except KeyboardInterrupt:
-        print("\n⚠️  测试被用户中断")
+        print("\n[WARN] Test interrupted by user")
     except Exception as e:
-        print(f"\n❌ 测试失败: {str(e)}")
+        print(f"\n[ERROR] Test failed: {str(e)}")
 
 if __name__ == "__main__":
-    main() 
+    main()

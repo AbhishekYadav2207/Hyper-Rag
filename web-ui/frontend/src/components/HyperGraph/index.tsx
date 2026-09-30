@@ -37,7 +37,7 @@ const HyperGraph = ({
     const [data, setData] = useState(undefined);
     const [loading, setLoading] = useState(false);
 
-    // 获取vertex邻居数据
+    // Get vertex neighbor data
     const fetchVertexNeighbor = async (vId, db) => {
         if (!vId) {
 return;
@@ -57,7 +57,7 @@ return;
             setData(neighborData);
         } catch (error) {
             console.error('Failed to fetch vertex neighbor:', error);
-            message.error(`获取图数据失败: ${error.message}`);
+            message.error(`Failed to fetch graph data: ${error.message}`);
         }
         setLoading(false);
     };
@@ -76,7 +76,7 @@ return;
         const plugins = [];
 
         if (data) {
-            // 添加顶点
+            // Add vertices
             for (const key in data.vertices) {
                 hyperData.nodes.push({
                     id: key,
@@ -85,7 +85,7 @@ return;
                 });
             }
 
-            // 创建样式函数
+            // Create style function
             const createStyle = (baseColor) => ({
                 fill: baseColor,
                 stroke: baseColor,
@@ -95,7 +95,7 @@ return;
                 // labelBackgroundRadius: 5,
                 // labelPlacement: 'center',
                 // labelAutoRotate: false,
-                // bubblesets配置
+                // BubbleSets configuration
                 maxRoutingIterations: 100,
                 maxMarchingIterations: 20,
                 pixelGroup: 4,
@@ -111,7 +111,7 @@ return;
                 virtualEdges: true,
             });
 
-            // 添加超边
+            // Add hyperedges
             const edgeKeys = Object.keys(data.edges);
             for (let i = 0; i < edgeKeys.length; i++) {
                 const key = edgeKeys[i];
@@ -127,7 +127,7 @@ return;
                 });
             }
 
-            // 添加tooltip插件
+            // Add tooltip plugin
             if (showTooltip) {
                 plugins.push({
                     type: 'tooltip',
@@ -136,10 +136,10 @@ return;
                         items.forEach((item) => {
                             result += `<h4>${item.id}</h4>`;
                             if (item.entity_type) {
-                                result += `<p><strong>类型:</strong> ${item.entity_type}</p>`;
+                                result += `<p><strong>Type:</strong> ${item.entity_type}</p>`;
                             }
                             if (item.description) {
-                                result += `<p><strong>描述:</strong> ${item.description.split('<SEP>').slice(0, 2).join('；')}</p>`;
+                                result += `<p><strong>Description:</strong> ${item.description.split('<SEP>').slice(0, 2).join('; ')}</p>`;
                             }
                         });
                         return result;
@@ -157,15 +157,15 @@ return;
                     size: 25,
                     labelText: d => d.id,
                     fill: d => {
-                        // 如果是当前查看的顶点，使用红色高亮
+                        // If current vertex being viewed, highlight red
                         if (d.id === vertexId) {
                             return 'black';
                         }
-                        // 根据entity_type设置不同颜色
+                        // Set different colors according to entity_type
                         if (d.entity_type) {
                             return entityTypeColors[d.entity_type] || '#8566CC' ;
                         }
-                        // 默认颜色
+                        // Default color
                         return '#8566CC';
                     },
                 }
@@ -203,7 +203,7 @@ return;
                 height,
                 ...containerStyle
             }}>
-                <Spin size="large" tip="加载超图数据中..." />
+                <Spin size="large" tip="Loading hypergraph data..." />
             </div>
         );
     }
@@ -218,7 +218,7 @@ return;
                 color: '#999',
                 ...containerStyle
             }}>
-                {!vertexId ? '请选择一个顶点' : '暂无图数据'}
+                {!vertexId ? 'Please select a vertex' : 'No graph data'}
             </div>
         );
     }

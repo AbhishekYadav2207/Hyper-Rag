@@ -41,7 +41,7 @@ const Setting: React.FC = () => {
   const [availableDatabases, setAvailableDatabases] = useState<any[]>([])
   const [testResults, setTestResults] = useState<any>({})
 
-  // 默认配置
+  // Default configuration
   const defaultSettings = {
     apiKey: '',
     modelProvider: 'openai',
@@ -50,25 +50,31 @@ const Setting: React.FC = () => {
     selectedDatabase: '',
     maxTokens: 2000,
     temperature: 0.7,
-    // 新增Mode配置，默认显示所有modes
-    availableModes: ['llm', 'naive', 'graph', 'hyper', 'hyper-lite']
+    // Mode configuration: adaptive is default and first-class
+    availableModes: ['adaptive', 'hyper', 'hyper-lite', 'naive', 'graph', 'llm']
   }
 
-  // 可用的查询模式配置
+  // Available query mode configurations
   const queryModes = [
-    { value: 'llm', label: 'LLM', icon: '🤖', description: '仅使用大语言模型直接回答' },
-    { value: 'naive', label: 'RAG', icon: '📚', description: '基础检索增强生成' },
-    { value: 'graph', label: 'Graph-RAG', icon: '🕸️', description: '基于图结构的检索增强生成' },
-    { value: 'hyper', label: 'Hyper-RAG', icon: '⚡', description: '基于超图的检索增强生成' },
+    {
+      value: 'adaptive',
+      label: 'Adaptive RAG',
+      icon: '🧠',
+      description: 'Intelligent dynamic routing between Lite and Core Hyper-RAG'
+    },
+    { value: 'hyper', label: 'Hyper-RAG (Core)', icon: '⚡', description: 'Comprehensive hypergraph retrieval-augmented generation' },
     {
       value: 'hyper-lite',
-      label: 'Hyper-RAG-Lite',
+      label: 'Hyper-RAG Lite',
       icon: '🔸',
-      description: '轻量级超图检索增强生成'
-    }
+      description: 'Fast lightweight hypergraph retrieval-augmented generation'
+    },
+    { value: 'naive', label: 'RAG', icon: '📚', description: 'Baseline vector retrieval-augmented generation' },
+    { value: 'graph', label: 'Graph-RAG', icon: '🕸️', description: 'Graph-based retrieval-augmented generation' },
+    { value: 'llm', label: 'LLM Direct', icon: '🤖', description: 'Direct LLM response without retrieval' }
   ]
 
-  // 模型提供商配置
+  // Model provider configuration
   const modelProviders = [
     {
       value: 'openai',
@@ -90,24 +96,24 @@ const Setting: React.FC = () => {
     },
     {
       value: 'custom',
-      label: t('settings.custom_api') || '自定义API',
+      label: t('settings.custom_api') || 'Custom API',
       models: ['custom-model'],
       defaultBaseUrl: 'http://localhost:11434'
     }
   ]
 
-  // 加载设置
+  // Load settings
   const loadSettings = async () => {
     setLoading(true)
     try {
-      // 首先尝试从localStorage加载Mode配置
+      // First try loading Mode configuration from localStorage
       const localModeSettings = localStorage.getItem('hyperrag_mode_settings')
       let modeSettings = {}
       if (localModeSettings) {
         try {
           modeSettings = JSON.parse(localModeSettings)
         } catch (e) {
-          console.error('解析本地Mode设置失败:', e)
+          console.error('Failed to parse local Mode settings:', e)
         }
       }
 
@@ -116,19 +122,19 @@ const Setting: React.FC = () => {
         const settings = await response.json()
         form.setFieldsValue({ ...defaultSettings, ...settings, ...modeSettings })
       } else {
-        // 如果获取失败，使用默认设置加上本地Mode设置
+        // If fetch fails, use default settings plus local Mode settings
         form.setFieldsValue({ ...defaultSettings, ...modeSettings })
       }
     } catch (error) {
-      console.error('加载设置失败:', error)
-      // 尝试加载本地Mode设置
+      console.error('Failed to load settings:', error)
+      // Try loading local Mode settings
       const localModeSettings = localStorage.getItem('hyperrag_mode_settings')
       let modeSettings = {}
       if (localModeSettings) {
         try {
           modeSettings = JSON.parse(localModeSettings)
         } catch (e) {
-          console.error('解析本地Mode设置失败:', e)
+          console.error('Failed to parse local Mode settings:', e)
         }
       }
       form.setFieldsValue({ ...defaultSettings, ...modeSettings })
@@ -138,7 +144,7 @@ const Setting: React.FC = () => {
     }
   }
 
-  // 加载可用数据库列表
+  // Load available databases list
   const loadDatabases = async () => {
     try {
       const response = await fetch(`${SERVER_URL}/databases`)
@@ -147,23 +153,23 @@ const Setting: React.FC = () => {
         setAvailableDatabases(databases)
       }
     } catch (error) {
-      console.error('加载数据库列表失败:', error)
-      // 如果API不存在，提供一些默认选项
+      console.error('Failed to load database list:', error)
+      // If API unavailable, provide default options
       setAvailableDatabases([
-        { name: 'hypergraph_wukong', description: '西游记超图' },
-        { name: 'hypergraph_A_Christmas_Carol', description: '圣诞颂歌超图' }
+        { name: 'hypergraph_wukong', description: 'Journey to the West Hypergraph' },
+        { name: 'hypergraph_A_Christmas_Carol', description: 'A Christmas Carol Hypergraph' }
       ])
     }
   }
 
-  // 保存设置
+  // Save settings
   const saveSettings = async (values: any) => {
     setSaveLoading(true)
     try {
-      // 分离Mode设置和其他设置
+      // Separate Mode settings and other settings
       const { availableModes, ...otherSettings } = values
 
-      // Mode设置保存到localStorage
+      // Save Mode settings to localStorage
       const modeSettings = { availableModes }
       localStorage.setItem('hyperrag_mode_settings', JSON.stringify(modeSettings))
 
@@ -177,14 +183,14 @@ const Setting: React.FC = () => {
 
       if (response.ok) {
         message.success(t('settings.save_success'))
-        // 保存到本地存储作为备份
+        // Save to local storage as backup
         localStorage.setItem('hyperrag_settings', JSON.stringify(otherSettings))
       } else {
         throw new Error(t('settings.save_failed'))
       }
     } catch (error) {
-      console.error('保存设置失败:', error)
-      // 即使后端保存失败，也保存到本地存储
+      console.error('Failed to save settings:', error)
+      // Save to local storage even if backend fails
       const { availableModes, ...otherSettings } = values
       localStorage.setItem('hyperrag_settings', JSON.stringify(otherSettings))
       localStorage.setItem('hyperrag_mode_settings', JSON.stringify({ availableModes }))
@@ -194,7 +200,7 @@ const Setting: React.FC = () => {
     }
   }
 
-  // 测试API连接
+  // Test API connection
   const testAPIConnection = async () => {
     const values = form.getFieldsValue()
     if (!values.apiKey) {
@@ -231,7 +237,7 @@ const Setting: React.FC = () => {
     }
   }
 
-  // 测试数据库连接
+  // Test database connection
   const testDatabaseConnection = async () => {
     const values = form.getFieldsValue()
     if (!values.selectedDatabase) {
@@ -264,22 +270,22 @@ const Setting: React.FC = () => {
     }
   }
 
-  // 重置设置
+  // Reset settings
   const resetSettings = () => {
     form.setFieldsValue(defaultSettings)
     setTestResults({})
-    // 也清除localStorage中的Mode设置
+    // Also clear Mode settings from localStorage
     localStorage.removeItem('hyperrag_mode_settings')
     message.info(t('settings.reset_success'))
   }
 
-  // 监听模型提供商变化
+  // Listen for model provider changes
   const handleProviderChange = (value: string) => {
     const provider = modelProviders.find(p => p.value === value)
     if (provider) {
       form.setFieldsValue({
         baseUrl: provider.defaultBaseUrl,
-        modelName: provider.models[0] // 设置默认模型，用户仍可输入自定义模型
+        modelName: provider.models[0] // Set default model, user can still enter custom model
       })
     }
   }
@@ -301,7 +307,7 @@ const Setting: React.FC = () => {
         </div>
 
         <Form form={form} layout="vertical" onFinish={saveSettings} initialValues={defaultSettings}>
-          {/* 系统配置区块 */}
+          {/* System configuration section */}
           <Card
             title={
               <span>
@@ -316,7 +322,7 @@ const Setting: React.FC = () => {
             </Form.Item>
           </Card>
 
-          {/* API 配置区块 */}
+          {/* API configuration section */}
           <Card
             title={
               <span>
@@ -436,19 +442,19 @@ const Setting: React.FC = () => {
             </Form.Item>
           </Card>
 
-          {/* Mode配置区块 */}
+          {/* Mode configuration section */}
           <Card
             title={
               <span>
                 <AppstoreOutlined style={{ marginRight: '8px' }} />
-                查询模式配置
+                Query Mode Configuration
               </span>
             }
             style={{ marginBottom: '24px' }}
           >
             <Alert
-              message="查询模式配置"
-              description="选择在聊天界面中显示的查询模式。配置将保存在本地浏览器中。"
+              message="Query Mode Configuration"
+              description="Select query modes displayed in the chat interface. Configuration is saved locally in browser."
               type="info"
               showIcon
               style={{ marginBottom: '24px' }}
@@ -456,8 +462,8 @@ const Setting: React.FC = () => {
 
             <Form.Item
               name="availableModes"
-              label="可用的查询模式"
-              extra="选择在聊天界面侧边栏中显示的查询模式"
+              label="Available Query Modes"
+              extra="Select query modes displayed in chat sidebar"
             >
               <Checkbox.Group style={{ width: '100%' }}>
                 <Row gutter={[16, 16]}>
@@ -483,7 +489,7 @@ const Setting: React.FC = () => {
             </Form.Item>
           </Card>
 
-          {/* 数据库配置区块 */}
+          {/* Database configuration section */}
           {/* <Card
             title={
               <span>

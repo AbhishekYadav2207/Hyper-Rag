@@ -1,6 +1,6 @@
 import { ProSettings } from '@ant-design/pro-components'
 
-/** prolayput 设置 */
+/** ProLayout settings */
 const Settings: ProSettings | undefined = {
   fixSiderbar: true,
   layout: 'mix',

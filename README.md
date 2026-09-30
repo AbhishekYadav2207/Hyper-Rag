@@ -671,6 +671,9 @@ python -m pytest tests/unit/test_key_rotation.py
 
 # Configuration & environment variable tests
 python -m pytest tests/unit/test_config.py
+
+# Language compliance guard tests
+python -m pytest tests/unit/test_language_guard.py
 ```
 
 #### 2. Internal Diagnostics (Live Provider Checks)

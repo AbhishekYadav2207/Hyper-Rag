@@ -96,9 +96,9 @@ def limit_async_func_call(max_size: int, waitting_time: float = 0.0001):
 
 def limit_async_gen_call(max_size: int):
     """
-    限制“异步生成器（async generator）”并发数的装饰器。
-    适用于 stream 场景：func(*args, **kwargs) 返回一个 async generator，
-    不能对其 await，只能 async for 迭代。
+    Decorator limiting concurrency for async generators.
+    Suitable for stream scenarios: func(*args, **kwargs) returns an async generator
+    which cannot be awaited directly, only iterated with async for.
     """
     sem = asyncio.Semaphore(max_size)
 
@@ -107,7 +107,7 @@ def limit_async_gen_call(max_size: int):
         async def gen_wrapper(*args, **kwargs):
             await sem.acquire()
             try:
-                agen = func(*args, **kwargs)  # 注意：这里不要 await
+                agen = func(*args, **kwargs)  # Note: do not await here
                 async for item in agen:
                     yield item
             finally:

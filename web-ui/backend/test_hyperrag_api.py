@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-HyperRAG API 测试脚本
+HyperRAG API Test Script
 
-这个脚本演示如何使用 HyperRAG 问答 API 接口。
-确保在运行之前：
-1. 启动后端服务器：uvicorn main:app --reload
-2. 在 settings.json 中配置正确的 API 密钥和模型设置
+This script demonstrates how to query the HyperRAG QA API endpoints.
+Ensure before running:
+1. Start backend server: uvicorn main:app --reload
+2. Configure appropriate API keys and settings in settings.json
 """
 
 import requests
@@ -13,28 +13,31 @@ import json
 import time
 from pathlib import Path
 
-# API 基础URL
+# API Base URL
 BASE_URL = "http://localhost:8000"
 
 def test_hyperrag_status():
-    """测试 HyperRAG 状态"""
-    print("=== 测试 HyperRAG 状态 ===")
+    """Test HyperRAG status endpoint."""
+    print("=== Test HyperRAG Status ===")
     response = requests.get(f"{BASE_URL}/hyperrag/status")
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
 
 def test_insert_document():
-    """测试文档插入"""
-    print("=== 测试文档插入 ===")
+    """Test document insertion."""
+    print("=== Test Document Insertion ===")
     
-    # 示例文档内容
-    document_content = open(Path("./public/sanguo.txt"), "r").read()
+    sample_path = Path("./public/sample.txt")
+    if sample_path.exists():
+        document_content = open(sample_path, "r", encoding="utf-8").read()
+    else:
+        document_content = "This is a sample document for HyperRAG testing."
     
     data = {
         "content": document_content,
         "retries": 3,
-        "database": "sanguo"
+        "database": "sample"
     }
     
     response = requests.post(f"{BASE_URL}/hyperrag/insert", json=data)
@@ -42,10 +45,10 @@ def test_insert_document():
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
 
-def test_query_hyperrag(question,database, mode="hyper"):
-    """测试问答查询"""
-    print(f"=== 测试 HyperRAG 查询 ({mode}) ===")
-    print(f"问题: {question}")
+def test_query_hyperrag(question, database, mode="adaptive"):
+    """Test question-answering query."""
+    print(f"=== Test HyperRAG Query ({mode}) ===")
+    print(f"Question: {question}")
     
     data = {
         "question": question,
@@ -66,62 +69,53 @@ def test_query_hyperrag(question,database, mode="hyper"):
     print(f"Success: {result.get('success', False)}")
     
     if result.get('success'):
-        print(f"回答: {result.get('response', 'No response')}")
+        print(f"Answer: {result.get('response', 'No response')}")
+        if result.get('adaptive_decision'):
+            print(f"Adaptive Decision: {result.get('adaptive_decision')}")
     else:
-        print(f"错误: {result.get('message', 'Unknown error')}")
+        print(f"Error: {result.get('message', 'Unknown error')}")
     print()
 
 def test_settings():
-    """测试设置接口"""
-    print("=== 测试设置接口 ===")
+    """Test settings endpoint."""
+    print("=== Test Settings Endpoint ===")
     response = requests.get(f"{BASE_URL}/settings")
     print(f"Status: {response.status_code}")
     print(f"Settings: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
 
 def test_get_databases():
-    """测试获取可用数据库列表"""
-    print("=== 测试获取可用数据库列表 ===")
+    """Test retrieving available databases."""
+    print("=== Test Get Available Databases ===")
     response = requests.get(f"{BASE_URL}/databases")
     print(f"Status: {response.status_code}")
     print(f"Databases: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
     print()
 
 def main():
-    """主测试函数"""
-    print("开始测试 HyperRAG API...")
+    """Main test workflow."""
+    print("Starting HyperRAG API tests...")
     print()
 
-    # 获取可用数据库列表
+    # Get available databases
     test_get_databases()
     
-    # 测试状态
+    # Test status
     test_hyperrag_status()
 
-    
-    # 测试设置
+    # Test settings
     test_settings()
     
-    # 测试文档插入
-    # test_insert_document()
-    
-    # 等待处理完成
-    # print("等待文档处理完成...")
-    # time.sleep(5)
-    
-    # 测试不同模式的查询
     test_questions = [
-        "统计三国中提到的人物"
+        "What are the central themes discussed in the knowledge base?"
     ]
     
     for question in test_questions:
-        # 测试 hyper 模式
-        test_query_hyperrag(question, "sanguo", "hyper")
-        
-        # 测试 naive 模式
-        test_query_hyperrag(question, "sanguo", "naive")
+        test_query_hyperrag(question, "default", "adaptive")
+        test_query_hyperrag(question, "default", "hyper")
+        test_query_hyperrag(question, "default", "hyper-lite")
     
-    print("测试完成！")
+    print("Tests completed!")
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -1,7 +1,6 @@
 /my_config.py
 .DS_Store
 caches/
-datasets/
 .vscode/
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -15,6 +14,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
+/datasets
 dist/
 downloads/
 eggs/
@@ -181,13 +181,18 @@ cython_debug/
 .pypirc
 
 # web-ui
+settings.json
 web-ui/backend/settings.json    
+hyperrag_cache/
 web-ui/backend/hyperrag_cache/
 web-ui/backend/uploads/
 web-ui/backend/files.db
+file_metadata.json
+*.hgdb
 
 # Local test caches & scratch
 test_cache/
 /scratch/
+/logs/
 *validation*.log
 *validation_benchmark*.json

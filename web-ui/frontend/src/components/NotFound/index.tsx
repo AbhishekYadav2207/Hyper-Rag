@@ -6,10 +6,10 @@ import type { NotFoundPropsType } from './type'
 const NotFound: React.FC<NotFoundPropsType> = ({
   status = '404',
   title = '404',
-  subTitle = '对不起！您访问的页面不存在',
+  subTitle = 'Sorry, the page you visited does not exist',
   extra = (
     <Button type="primary">
-      <Link to="/">返回首页</Link>
+      <Link to="/">Back to Home</Link>
     </Button>
   )
 }) => {

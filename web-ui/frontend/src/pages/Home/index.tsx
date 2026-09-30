@@ -43,14 +43,14 @@ const HyperRAGHome = () => {
     const [conversations, setConversations] = useState([])
     const [activeConversationId, setActiveConversationId] = useState('')
     const [inputValue, setInputValue] = useState('')
-    const [queryMode, setQueryMode] = useState('hyper')
+    const [queryMode, setQueryMode] = useState('adaptive')
     const [isLoading, setIsLoading] = useState(false)
-    const [availableModes, setAvailableModes] = useState(['naive', 'graph', 'hyper'])
+    const [availableModes, setAvailableModes] = useState(['adaptive', 'hyper', 'hyper-lite', 'naive'])
 
-    // 新增对比模式相关状态
+    // Compare mode state
     const [isCompareMode, setIsCompareMode] = useState(false)
-    const [compareMode1, setCompareMode1] = useState('hyper')
-    const [compareMode2, setCompareMode2] = useState('naive')
+    const [compareMode1, setCompareMode1] = useState('adaptive')
+    const [compareMode2, setCompareMode2] = useState('hyper-lite')
 
     // Storage keys
     const STORAGE_KEYS = {
@@ -58,16 +58,17 @@ const HyperRAGHome = () => {
         ACTIVE_ID: 'hyperrag_active_conversation_v2'
     }
 
-    // 定义所有可用的模式配置
+    // Available mode configurations
     const allModes = [
-        { value: 'llm', label: 'LLM', icon: Bot, color: 'bg-yellow-500' },
+        { value: 'adaptive', label: 'Adaptive RAG', icon: Zap, color: 'bg-indigo-600' },
+        { value: 'hyper', label: 'Hyper-RAG (Core)', icon: Layers, color: 'bg-purple-500' },
+        { value: 'hyper-lite', label: 'Hyper-RAG Lite', icon: BookOpen, color: 'bg-green-600' },
         { value: 'naive', label: 'RAG', icon: BookOpen, color: 'bg-blue-500' },
         { value: 'graph', label: 'Graph-RAG', icon: Bot, color: 'bg-orange-500' },
-        { value: 'hyper', label: 'Hyper-RAG', icon: Zap, color: 'bg-purple-500' },
-        { value: 'hyper-lite', label: 'Hyper-RAG-Lite', icon: Layers, color: 'bg-green-500' }
+        { value: 'llm', label: 'LLM Direct', icon: Bot, color: 'bg-yellow-500' }
     ]
 
-    // 从localStorage加载Mode配置
+    // Load Mode configuration from localStorage
     const loadModeSettings = () => {
         try {
             const modeSettings = localStorage.getItem('hyperrag_mode_settings')
@@ -75,33 +76,33 @@ const HyperRAGHome = () => {
                 const parsed = JSON.parse(modeSettings)
                 if (parsed.availableModes && Array.isArray(parsed.availableModes) && parsed.availableModes.length > 0) {
                     setAvailableModes(parsed.availableModes)
-                    // 如果当前选择的mode不在可用列表中，选择第一个可用的mode
+                    // If selected mode not in available list, pick first available
                     if (!parsed.availableModes.includes(queryMode)) {
                         setQueryMode(parsed.availableModes[0])
                     }
                 } else {
-                    // 如果没有配置或配置为空，使用默认配置
-                    setAvailableModes(['naive', 'graph', 'hyper'])
+                    // Fallback to default modes with adaptive first
+                    setAvailableModes(['adaptive', 'hyper', 'hyper-lite', 'naive'])
                 }
             }
         } catch (error) {
             console.error('Failed to load mode settings:', error)
-            // 出错时使用默认配置
-            setAvailableModes(['naive', 'graph', 'hyper'])
+            // Fallback to default modes with adaptive first
+            setAvailableModes(['adaptive', 'hyper', 'hyper-lite', 'naive'])
         }
     }
 
-    // 监听localStorage变化
+    // Listen for localStorage changes
     const handleStorageChange = (e) => {
         if (e.key === 'hyperrag_mode_settings') {
             loadModeSettings()
         }
     }
 
-    // 获取当前启用的模式列表
+    // Get current enabled modes list
     const enabledModes = allModes.filter(mode => availableModes.includes(mode.value))
 
-    // 获取模式标签的函数
+    // Function to get mode label
     const getModeLabel = (roleValue) => {
         if (roleValue === 'user') {
 return 'You'
@@ -182,11 +183,11 @@ return 'You'
             content,
             role,
             timestamp: new Date(),
-            // 添加检索信息字段
+            // Add retrieval info field
             entities: extraData?.entities || [],
             hyperedges: extraData?.hyperedges || [],
             text_units: extraData?.text_units || [],
-            // 新增对比模式字段
+            // Add comparison mode fields
             isCompare: extraData?.isCompare || false,
             compareResults: extraData?.compareResults || null
         }
@@ -210,12 +211,13 @@ return 'You'
                             index === conv.messages.length - 1
                                 ? {
                                     ...msg,
-                                    content,
-                                    // 如果有新的检索信息，更新它们
                                     entities: extraData?.entities || msg.entities || [],
                                     hyperedges: extraData?.hyperedges || msg.hyperedges || [],
                                     text_units: extraData?.text_units || msg.text_units || [],
-                                    // 更新对比结果
+                                    adaptive_decision: extraData?.adaptive_decision || msg.adaptive_decision || null,
+                                    validation: extraData?.validation || msg.validation || null,
+                                    language_guard: extraData?.language_guard || msg.language_guard || null,
+                                    // Update compare results
                                     isCompare: extraData?.isCompare !== undefined ? extraData.isCompare : msg.isCompare,
                                     compareResults: extraData?.compareResults || msg.compareResults
                                 }
@@ -227,7 +229,7 @@ return 'You'
         )
     }
 
-    // 单模式查询函数
+    // Single mode query function
     const querySingleMode = async (question, mode) => {
         const response = await fetch(`${SERVER_URL}/hyperrag/query`, {
             method: 'POST',
@@ -267,8 +269,8 @@ return
         addMessage(userMessage, 'user')
 
         if (isCompareMode) {
-            // 对比模式：同时查询两个模式
-            addMessage('正在对比分析中...', 'compare', { isCompare: true })
+            // Compare mode: query both modes concurrently
+            addMessage('Running comparative analysis...', 'compare', { isCompare: true })
 
             try {
                 const [result1, result2] = await Promise.all([
@@ -277,11 +279,12 @@ return
                 ])
 
                 const modeNames = {
-                    'hyper': 'Hyper-RAG',
-                    'hyper-lite': 'Hyper-RAG-Lite',
+                    'adaptive': 'Adaptive RAG',
+                    'hyper': 'Hyper-RAG (Core)',
+                    'hyper-lite': 'Hyper-RAG Lite',
                     'graph': 'Graph-RAG',
                     'naive': 'RAG',
-                    'llm': 'LLM',
+                    'llm': 'LLM Direct',
                 }
 
                 const compareResults = {
@@ -292,6 +295,8 @@ return
                         entities: result1.entities || [],
                         hyperedges: result1.hyperedges || [],
                         text_units: result1.text_units || [],
+                        adaptive_decision: result1.adaptive_decision || null,
+                        validation: result1.validation || null,
                         success: result1.success
                     },
                     mode2: {
@@ -301,45 +306,50 @@ return
                         entities: result2.entities || [],
                         hyperedges: result2.hyperedges || [],
                         text_units: result2.text_units || [],
+                        adaptive_decision: result2.adaptive_decision || null,
+                        validation: result2.validation || null,
                         success: result2.success
                     }
                 }
 
-                updateLastMessage('对比分析完成', {
+                updateLastMessage('Comparative analysis complete', {
                     isCompare: true,
                     compareResults: compareResults
                 })
 
             } catch (error) {
                 console.error('Error in compare mode:', error)
-                updateLastMessage(`对比分析出错: ${error instanceof Error ? error.message : 'Unknown error'}`, {
+                updateLastMessage(`Comparative analysis error: ${error instanceof Error ? error.message : 'Unknown error'}`, {
                     isCompare: true
                 })
             }
         } else {
-            // 单模式查询（原有逻辑）
-            addMessage('正在思考中...', queryMode)
+            // Single mode query
+            addMessage('Thinking...', queryMode)
 
             try {
                 const data = await querySingleMode(userMessage, queryMode)
 
                 if (data.success) {
                     const modeNames = {
-                        'hyper': 'Hyper-RAG',
-                        'hyper-lite': 'Hyper-RAG-Lite',
+                        'adaptive': 'Adaptive RAG',
+                        'hyper': 'Hyper-RAG (Core)',
+                        'hyper-lite': 'Hyper-RAG Lite',
                         'graph': 'Graph-RAG',
                         'naive': 'RAG',
-                        'llm': 'LLM',
+                        'llm': 'LLM Direct',
                     }
                     const modeName = modeNames[queryMode] || queryMode
 
-                    let responseContent = data.response || 'No response content'
-                    responseContent += `\n\n---\n*Mode: ${modeName}*`
+                    const responseContent = data.response || 'No response content'
 
                     updateLastMessage(responseContent, {
                         entities: data.entities || [],
                         hyperedges: data.hyperedges || [],
-                        text_units: data.text_units || []
+                        text_units: data.text_units || [],
+                        adaptive_decision: data.adaptive_decision || null,
+                        validation: data.validation || null,
+                        language_guard: data.language_guard || null,
                     })
                 } else {
                     throw new Error(data.message || 'Query failed')
@@ -367,7 +377,7 @@ return
         loadFromStorage()
         loadModeSettings()
 
-        // 添加storage事件监听器
+        // Add storage event listener
         window.addEventListener('storage', handleStorageChange)
 
         return () => {
@@ -381,14 +391,14 @@ return
         }
     }, [conversations, activeConversationId])
 
-    // 当availableModes变化时，确保当前选择的mode在可用列表中
+    // Ensure selected mode is in availableModes
     useEffect(() => {
         if (availableModes.length > 0 && !availableModes.includes(queryMode)) {
             setQueryMode(availableModes[0])
         }
     }, [availableModes, queryMode])
 
-    // 当对比模式切换时，确保选择的模式在可用列表中
+    // Ensure compare mode is in availableModes
     useEffect(() => {
         if (availableModes.length > 0) {
             if (!availableModes.includes(compareMode1)) {
@@ -411,7 +421,7 @@ return
                         <div className="flex items-center space-x-2 mb-3">
                             <Settings className="w-5 h-5 shrink-0 text-gray-500" />
                             <span className="font-medium text-gray-700 flex-1">Mode: </span>
-                            {/* 对比模式开关 */}
+                            {/* Compare mode toggle */}
                             <div className=" p-2 bg-white rounded-md">
                                 <label className="flex items-center cursor-pointer">
                                     <input
@@ -420,7 +430,7 @@ return
                                         onChange={(e) => setIsCompareMode(e.target.checked)}
                                         className="rounded"
                                     />
-                                    <span className="text-sm font-medium text-gray-700 ml-1">对比</span>
+                                    <span className="text-sm font-medium text-gray-700 ml-1">Compare</span>
                                     <GitCompare className="w-4 h-4 text-blue-500" />
                                 </label>
                             </div>
@@ -428,7 +438,7 @@ return
 
 
                         {isCompareMode ? (
-                            /* 对比模式：显示两个模式选择器 */
+                            /* Compare mode: show two mode selectors */
                             <div className="space-y-3">
                                 <div>
                                     <span className="text-xs text-gray-500 mb-1 block">Mode 1:</span>
@@ -474,7 +484,7 @@ return
                                 </div>
                             </div>
                         ) : (
-                            /* 单模式：显示原有的模式选择器 */
+                            /* Single mode: show mode selector */
                             enabledModes.map((mode) => {
                                 const IconComponent = mode.icon
                                 return (
@@ -620,7 +630,7 @@ return
                                         <div className="flex-1 space-y-2">
                                             <div className="flex items-center space-x-2">
                                                 <span className="font-medium text-gray-900">
-                                                    {message.isCompare ? '对比分析' : getModeLabel(message.role)}
+                                                    {message.isCompare ? 'Comparative Analysis' : getModeLabel(message.role)}
                                                 </span>
                                                 <span className="text-xs text-gray-500">
                                                     {new Date(message.timestamp).toLocaleTimeString()}
@@ -628,9 +638,9 @@ return
                                             </div>
 
                                             {message.isCompare && message.compareResults ? (
-                                                /* 对比模式的消息展示 */
+                                                /* Compare mode message display */
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    {/* 模式1结果 */}
+                                                    {/* Mode 1 result */}
                                                     <div className="flex flex-col bg-blue-50 border border-blue-200 rounded-lg p-4">
                                                         <div className="flex items-center space-x-2 mb-3">
                                                             <div className="flex items-center space-x-2">
@@ -695,7 +705,7 @@ return
                                                         </div>
                                                     </div>
 
-                                                    {/* 模式2结果 */}
+                                                    {/* Mode 2 result */}
                                                     <div className="flex flex-col bg-green-50 border border-green-200 rounded-lg p-4">
                                                         <div className="flex items-center space-x-2 mb-3">
                                                             <div className="flex items-center space-x-2">
@@ -761,34 +771,79 @@ return
                                                     </div>
                                                 </div>
                                             ) : (
-                                                /* 单模式的消息展示（原有逻辑） */
+                                                /* Single mode message display */
                                                 <div className={`rounded-lg p-4 ${message.role === 'user'
                                                     ? 'bg-blue-50 border border-blue-200'
                                                     : 'bg-gray-50 border border-gray-200'
                                                     }`}>
                                                     {message.role !== 'user' ? (
-                                                        <div className='flex'>
-                                                            <div className="flex-1 prose prose-sm z-0">
-                                                                <ReactMarkdown
-                                                                    components={{
-                                                                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                                                                        code: ({ children, className }) => (
-                                                                            <code className={`${className} bg-gray-100 px-1 rounded`}>
-                                                                                {children}
-                                                                            </code>
-                                                                        ),
-                                                                        pre: ({ children }) => (
-                                                                            <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto">
-                                                                                {children}
-                                                                            </pre>
-                                                                        ),
-                                                                    }}
-                                                                >
-                                                                    {message.content}
-                                                                </ReactMarkdown>
-                                                            </div>
+                                                        <div className='flex flex-col'>
+                                                            {message.adaptive_decision && (
+                                                                <div className="mb-3 p-2.5 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg text-xs space-y-1">
+                                                                    <div className="flex flex-wrap items-center gap-2">
+                                                                        <span className="font-semibold text-indigo-900 flex items-center">
+                                                                            <Zap className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                                                                            Adaptive RAG
+                                                                        </span>
+                                                                        <span className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-800 font-medium">
+                                                                            Path: <strong className="text-indigo-900">{message.adaptive_decision.mode?.toUpperCase()}</strong>
+                                                                        </span>
+                                                                        <span className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-800">
+                                                                            Complexity: <strong>{message.adaptive_decision.score}</strong>
+                                                                        </span>
+                                                                        {message.adaptive_decision.escalated && (
+                                                                            <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300 font-medium">
+                                                                                Escalation: Lite → Core
+                                                                            </span>
+                                                                        )}
+                                                                        {message.adaptive_decision.retrieval_sufficiency_score !== undefined && message.adaptive_decision.retrieval_sufficiency_score !== null && (
+                                                                            <span className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-800">
+                                                                                Sufficiency: <strong>{message.adaptive_decision.retrieval_sufficiency_score}</strong>
+                                                                            </span>
+                                                                        )}
+                                                                        {message.validation && (
+                                                                            <span className={`px-2 py-0.5 rounded border font-medium ${message.validation.valid ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                                                                                Validation: <strong>{message.validation.valid ? 'Valid' : 'Warning'} ({message.validation.score})</strong>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {message.adaptive_decision.escalated && message.adaptive_decision.escalation_reason && (
+                                                                        <div className="text-amber-800 text-[11px] pt-1">
+                                                                            Reason: {message.adaptive_decision.escalation_reason}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {!message.adaptive_decision && message.validation && (
+                                                                <div className="mb-3 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs flex items-center gap-2">
+                                                                    <span className="font-semibold text-emerald-900">Validation:</span>
+                                                                    <span className="bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-800 font-medium">
+                                                                        Score: {message.validation.score} ({message.validation.valid ? 'Valid' : 'Warning'})
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            <div className='flex'>
+                                                                <div className="flex-1 prose prose-sm z-0">
+                                                                    <ReactMarkdown
+                                                                        components={{
+                                                                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                                            code: ({ children, className }) => (
+                                                                                <code className={`${className} bg-gray-100 px-1 rounded`}>
+                                                                                    {children}
+                                                                                </code>
+                                                                            ),
+                                                                            pre: ({ children }) => (
+                                                                                <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto">
+                                                                                    {children}
+                                                                                </pre>
+                                                                            ),
+                                                                        }}
+                                                                    >
+                                                                        {message.content}
+                                                                    </ReactMarkdown>
+                                                                </div>
                                                             <div className='flex-[0.7] overflow-auto pl-2 z-10'>
-                                                                {/* 显示检索信息 */}
+                                                                {/* Display retrieval info */}
                                                                 <RetrievalInfo
                                                                     entities={message.entities || []}
                                                                     hyperedges={message.hyperedges || []}
@@ -796,7 +851,7 @@ return
                                                                     mode={message.role}
                                                                 />
 
-                                                                {/* 超图可视化展示 */}
+                                                                {/* HyperGraph visualization */}
                                                                 {((message.entities && message.entities.length > 0) ||
                                                                     (message.hyperedges && message.hyperedges.length > 0)) && (
                                                                         <div className="mt-4">
@@ -810,6 +865,7 @@ return
                                                                         </div>
                                                                     )}
                                                             </div>
+                                                        </div>
                                                         </div>
                                                     ) : (
                                                         <p className="text-gray-900 whitespace-pre-wrap m-0">
@@ -834,7 +890,7 @@ return
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyPress={handleKeyPress}
                                     placeholder={isCompareMode
-                                        ? `对比 ${getModeLabel(compareMode1)} 和 ${getModeLabel(compareMode2)} 的回答...`
+                                        ? `Compare ${getModeLabel(compareMode1)} and ${getModeLabel(compareMode2)} responses...`
                                         : "Ask me anything about your knowledge base..."
                                     }
                                     className="flex-1 h-7 resize-none"

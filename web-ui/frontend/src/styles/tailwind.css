@@ -9,7 +9,7 @@ button {
     /* border-radius; */
 }
 
-/* 自定义组件样式 */
+/* Custom component styles */
 @layer components {
     .btn-primary {
         @apply bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors duration-200;
@@ -40,7 +40,7 @@ button {
     }
 }
 
-/* 自定义工具类 */
+/* Custom utility classes */
 @layer utilities {
     .text-shadow {
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
@@ -55,7 +55,7 @@ button {
     }
 }
 
-/* 响应式网格布局 */
+/* Responsive grid layout */
 .grid-responsive {
     @apply grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4;
 }
@@ -63,7 +63,7 @@ button {
     padding: 0 !important;
 }
 
-/* 增大菜单字号 */
+/* Increase menu font size */
 .ant-pro-layout .ant-menu-item,
 .ant-pro-layout .ant-menu-submenu-title {
     font-size: 16px !important;
@@ -75,7 +75,7 @@ button {
     line-height: 1.5 !important;
 }
 
-/* 增大侧边栏菜单字号 */
+/* Increase sidebar menu font size */
 .ant-pro-sider .ant-menu-item,
 .ant-pro-sider .ant-menu-submenu-title {
     font-size: 16px !important;
@@ -89,14 +89,14 @@ button {
     padding: 10px 16px 10px 32px !important;
 }
 
-/* 增大顶部菜单字号 */
+/* Increase top menu font size */
 .ant-pro-layout-header .ant-menu-item,
 .ant-pro-layout-header .ant-menu-submenu-title {
     font-size: 16px !important;
     line-height: 1.5 !important;
 }
 
-/* 调整菜单图标大小和间距 */
+/* Adjust menu icon size and spacing */
 .ant-pro-layout .ant-menu-item .anticon,
 .ant-pro-layout .ant-menu-submenu-title .anticon {
     font-size: 18px !important;
@@ -109,7 +109,7 @@ button {
     /* margin-right: 12px !important; */
 }
 
-/* 确保菜单项有足够的点击区域 */
+/* Ensure menu items have sufficient click area */
 .ant-pro-layout .ant-menu-item,
 .ant-pro-layout .ant-menu-submenu-title {
     min-height: 48px !important;

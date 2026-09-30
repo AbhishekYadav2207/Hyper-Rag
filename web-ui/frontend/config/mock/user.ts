@@ -7,7 +7,7 @@ export default [
     response: ({ body }: any) => {
       const resObj: Global.ResultType = {
         code: 200,
-        message: '操作成功',
+        message: 'Operation successful',
         data: {
           tokenHead: 'Bearer ',
           token:
@@ -23,7 +23,7 @@ export default [
     response: ({ body }: any) => {
       const resObj: Global.ResultType = {
         code: 200,
-        message: '操作成功',
+        message: 'Operation successful',
         data: {}
       }
       return resObj

@@ -59,7 +59,7 @@ const HyperDB = () => {
     const [vertexForm] = Form.useForm();
     const [hyperedgeForm] = Form.useForm();
 
-    // 分页相关状态
+    // Pagination state
     const [verticesPagination, setVerticesPagination] = useState({
         current: 1,
         pageSize: 10,
@@ -71,13 +71,13 @@ const HyperDB = () => {
         total: 0
     });
 
-    // 初始化数据库
+    // Initialize database
     useEffect(() => {
         storeGlobalUser.restoreSelectedDatabase();
         storeGlobalUser.loadDatabases();
     }, []);
 
-    // 获取数据
+    // Fetch data
     const fetchData = async (database = storeGlobalUser.selectedDatabase, resetPagination = false) => {
         if (!database) {
 return;
@@ -86,7 +86,7 @@ return;
         setLoading(true);
         console.log('Fetching data from:', SERVER_URL, 'Database:', database);
 
-        // 如果需要重置分页，则重置到第一页
+        // If pagination reset needed, reset to first page
         const currentVerticesPage = resetPagination ? 1 : verticesPagination.current;
         const currentHyperedgesPage = resetPagination ? 1 : hyperedgesPagination.current;
 
@@ -121,9 +121,9 @@ return;
             console.log('- Vertices:', verticesData);
             console.log('- Hyperedges:', hyperedgesData);
 
-            // 处理vertices数据
+            // Process vertices data
             if (verticesData.data) {
-                // 分页数据
+                // Paginated data
                 setVertices(verticesData.data);
                 setVerticesPagination({
                     current: verticesData.page,
@@ -131,7 +131,7 @@ return;
                     total: verticesData.total
                 });
             } else {
-                // 旧版本非分页数据
+                // Legacy non-paginated data
                 setVertices(verticesData);
                 setVerticesPagination({
                     current: 1,
@@ -140,9 +140,9 @@ return;
                 });
             }
 
-            // 处理hyperedges数据
+            // Process hyperedges data
             if (hyperedgesData.data) {
-                // 分页数据
+                // Paginated data
                 setHyperedges(hyperedgesData.data);
                 setHyperedgesPagination({
                     current: hyperedgesData.page,
@@ -150,7 +150,7 @@ return;
                     total: hyperedgesData.total
                 });
             } else {
-                // 旧版本非分页数据
+                // Legacy non-paginated data
                 setHyperedges(hyperedgesData);
                 setHyperedgesPagination({
                     current: 1,
@@ -160,19 +160,19 @@ return;
             }
         } catch (error) {
             console.error('Fetch error:', error);
-            message.error(t('database.fetch_data_failed') + '：' + error.message);
+            message.error(t('database.fetch_data_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
-    // 当数据库选择改变时，重新获取数据
+    // Re-fetch data when database selection changes
     useEffect(() => {
         if (storeGlobalUser.selectedDatabase) {
             fetchData(storeGlobalUser.selectedDatabase, true);
         }
     }, [storeGlobalUser.selectedDatabase]);
 
-    // 获取vertex详细信息
+    // Get vertex details
     const getVertexDetail = async (vertexId) => {
         try {
             const url = `${SERVER_URL}/db/vertices/${encodeURIComponent(vertexId)}?database=${encodeURIComponent(storeGlobalUser.selectedDatabase)}`;
@@ -180,12 +180,12 @@ return;
             const data = await response.json();
             return data;
         } catch (error) {
-            message.error(t('database.fetch_vertex_detail_failed') + '：' + error.message);
+            message.error(t('database.fetch_vertex_detail_failed') + ': ' + error.message);
             return null;
         }
     };
 
-    // 获取hyperedge详细信息
+    // Get hyperedge details
     const getHyperedgeDetail = async (hyperedgeId) => {
         try {
             const url = `${SERVER_URL}/db/hyperedges/${encodeURIComponent(hyperedgeId)}?database=${encodeURIComponent(storeGlobalUser.selectedDatabase)}`;
@@ -193,12 +193,12 @@ return;
             const data = await response.json();
             return data;
         } catch (error) {
-            message.error(t('database.fetch_hyperedge_detail_failed') + '：' + error.message);
+            message.error(t('database.fetch_hyperedge_detail_failed') + ': ' + error.message);
             return null;
         }
     };
 
-    // 添加/编辑vertex
+    // Add / edit vertex
     const handleVertexSubmit = async (values) => {
         try {
             setLoading(true);
@@ -234,23 +234,23 @@ return;
                 message.success(result.message);
                 setModalVisible(false);
                 form.resetFields();
-                // 保持当前分页状态，不重置分页
+                // Keep current pagination, do not reset
                 fetchData(storeGlobalUser.selectedDatabase, false);
             } else {
                 message.error(result.message);
             }
         } catch (error) {
-            message.error(t('database.operation_failed') + '：' + error.message);
+            message.error(t('database.operation_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
-    // 添加/编辑hyperedge
+    // Add / edit hyperedge
     const handleHyperedgeSubmit = async (values) => {
         try {
             setLoading(true);
 
-            // 处理vertices字符串，转换为数组
+            // Process vertices string into array
             const verticesArray = values.vertices.split(',').map(v => v.trim()).filter(v => v);
             const submitData = {
                 ...values,
@@ -287,18 +287,18 @@ return;
                 message.success(result.message);
                 setModalVisible(false);
                 form.resetFields();
-                // 保持当前分页状态，不重置分页
+                // Keep current pagination, do not reset
                 fetchData(storeGlobalUser.selectedDatabase, false);
             } else {
                 message.error(result.message);
             }
         } catch (error) {
-            message.error(t('database.operation_failed') + '：' + error.message);
+            message.error(t('database.operation_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
-    // 删除vertex
+    // Delete vertex
     const handleDeleteVertex = async (vertexId) => {
         try {
             setLoading(true);
@@ -311,18 +311,18 @@ return;
 
             if (result.success) {
                 message.success(result.message);
-                // 保持当前分页状态，不重置分页
+                // Keep current pagination, do not reset
                 fetchData(storeGlobalUser.selectedDatabase, false);
             } else {
                 message.error(result.message);
             }
         } catch (error) {
-            message.error(t('database.delete_failed') + '：' + error.message);
+            message.error(t('database.delete_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
-    // 删除hyperedge
+    // Delete hyperedge
     const handleDeleteHyperedge = async (hyperedgeId) => {
         try {
             setLoading(true);
@@ -335,29 +335,29 @@ return;
 
             if (result.success) {
                 message.success(result.message);
-                // 保持当前分页状态，不重置分页
+                // Keep current pagination, do not reset
                 fetchData(storeGlobalUser.selectedDatabase, false);
             } else {
                 message.error(result.message);
             }
         } catch (error) {
-            message.error(t('database.delete_failed') + '：' + error.message);
+            message.error(t('database.delete_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
-    // 打开modal
+    // Open modal
     const openModal = async (type, dataType, record = null) => {
         setModalType(type);
         setModalDataType(dataType);
         setSelectedRecord(record);
 
-        // 重置表单
+        // Reset form
         form.resetFields();
 
         if ((type === 'edit' || type === 'view') && record) {
             if (dataType === 'vertex') {
-                // 先显示modal，然后加载数据
+                // Show modal first then load data
                 setModalVisible(true);
                 setModalLoading(true);
 
@@ -373,13 +373,13 @@ return;
                         });
                     }
                 } catch (error) {
-                    message.error(t('database.fetch_vertex_detail_failed') + '：' + error.message);
+                    message.error(t('database.fetch_vertex_detail_failed') + ': ' + error.message);
                 } finally {
                     setModalLoading(false);
                 }
             } else if (dataType === 'hyperedge') {
                 if (type === 'view') {
-                    // 查看hyperedge详情
+                    // View hyperedge details
                     setModalVisible(true);
                     setModalLoading(true);
 
@@ -393,12 +393,12 @@ return;
                             });
                         }
                     } catch (error) {
-                        message.error(t('database.fetch_hyperedge_detail_failed') + '：' + error.message);
+                        message.error(t('database.fetch_hyperedge_detail_failed') + ': ' + error.message);
                     } finally {
                         setModalLoading(false);
                     }
                 } else {
-                    // hyperedge编辑时，使用现有数据
+                    // On hyperedge edit, use existing data
                     setModalVisible(true);
                     setModalLoading(true);
 
@@ -412,19 +412,19 @@ return;
                             });
                         }
                     } catch (error) {
-                        message.error(t('database.fetch_hyperedge_detail_failed') + '：' + error.message);
+                        message.error(t('database.fetch_hyperedge_detail_failed') + ': ' + error.message);
                     } finally {
                         setModalLoading(false);
                     }
                 }
             }
         } else {
-            // 添加模式直接显示modal
+            // Add mode: show modal directly
             setModalVisible(true);
         }
     };
 
-    // Vertices表格列定义
+    // Vertices table column definitions
     const vertexColumns = [
         {
             title: t('database.vertex_id'),
@@ -468,7 +468,7 @@ return;
         },
     ];
 
-    // Hyperedges表格列定义
+    // Hyperedges table column definitions
     const hyperedgeColumns = [
         {
             title: t('database.hyperedge'),
@@ -540,13 +540,13 @@ return;
         },
     ];
 
-    // 处理vertices数据为表格格式
+    // Format vertices data for table
     const verticesTableData = vertices.map(vertex => ({
         key: vertex,
         vertex_id: vertex
     }));
 
-    // 处理hyperedges数据为表格格式
+    // Format hyperedges data for table
     const hyperedgesTableData = hyperedges.map((hyperedge, index) => ({
         key: index,
         hyperedge_id: hyperedge.id || hyperedge,
@@ -555,9 +555,9 @@ return;
         summary: hyperedge.summary || ''
     }));
 
-    // 数据库切换处理
+    // Handle database switch
     const onDatabaseChange = () => {
-        // 重置分页
+        // Reset pagination
         setVerticesPagination({
             current: 1,
             pageSize: 10,
@@ -571,21 +571,21 @@ return;
         fetchData(storeGlobalUser.selectedDatabase, true);
     };
 
-    // 处理vertices分页变化
+    // Handle vertices pagination change
     const handleVerticesTableChange = (pagination) => {
         setVerticesPagination(pagination);
-        // 重新请求数据
+        // Re-fetch data
         fetchVerticesData(pagination.current, pagination.pageSize);
     };
 
-    // 处理hyperedges分页变化
+    // Handle hyperedges pagination change
     const handleHyperedgesTableChange = (pagination) => {
         setHyperedgesPagination(pagination);
-        // 重新请求数据
+        // Re-fetch data
         fetchHyperedgesData(pagination.current, pagination.pageSize);
     };
 
-    // 获取vertices数据
+    // Get vertices data
     const fetchVerticesData = async (page = 1, pageSize = 10) => {
         const database = storeGlobalUser.selectedDatabase;
         if (!database) {
@@ -620,12 +620,12 @@ return;
             }
         } catch (error) {
             console.error('Fetch vertices error:', error);
-            message.error(t('database.fetch_data_failed') + '：' + error.message);
+            message.error(t('database.fetch_data_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
-    // 获取hyperedges数据
+    // Get hyperedges data
     const fetchHyperedgesData = async (page = 1, pageSize = 10) => {
         const database = storeGlobalUser.selectedDatabase;
         if (!database) {
@@ -660,14 +660,14 @@ return;
             }
         } catch (error) {
             console.error('Fetch hyperedges error:', error);
-            message.error(t('database.fetch_data_failed') + '：' + error.message);
+            message.error(t('database.fetch_data_failed') + ': ' + error.message);
         }
         setLoading(false);
     };
 
     return (
         <div>
-            {/* 顶部数据库选择器 */}
+            {/* Top database selector */}
             <Card style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -693,10 +693,10 @@ return;
                 )}
             </Card>
 
-            {/* 数据表格区域 */}
+            {/* Data table section */}
             {storeGlobalUser.selectedDatabase ? (
                 <div className='flex  gap-4'>
-                    {/* Vertices表格 */}
+                    {/* Vertices table */}
                     <Card title={t('database.vertices')} style={{ marginBottom: 24 }}
                         extra={
                             <Button
@@ -719,7 +719,7 @@ return;
                         />
                     </Card>
 
-                    {/* Hyperedges表格 */}
+                    {/* Hyperedges table */}
                     <Card title={t('database.hyperedges')}
                         className='flex-1'
                         extra={
@@ -792,9 +792,9 @@ return;
             >
                 <Spin spinning={modalLoading} tip={t('database.loading_data')}>
                     {modalType === 'view' && modalDataType === 'vertex' ? (
-                        // 查看Vertex时并列显示详细信息和超图
+                        // View vertex: show details and hypergraph side-by-side
                         <div style={{ display: 'flex', gap: '20px', height: '500px' }}>
-                            {/* 左侧：详细信息 */}
+                            {/* Left: detailed information */}
                             <div style={{ flex: '0 0 400px', overflowY: 'auto' }}>
                                 <Card title={t('database.detail_info')} size="small" style={{ height: '100%' }}>
                                     <Form
@@ -824,7 +824,7 @@ return;
                                 </Card>
                             </div>
 
-                            {/* 右侧：关系图谱 */}
+                            {/* Right: relationship graph */}
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <Card title={t('database.relation_graph')} size="small" style={{ height: '100%' }}>
                                     <div style={{ height: 'calc(100% - 40px)' }}>
@@ -841,7 +841,7 @@ return;
                             </div>
                         </div>
                     ) : (
-                        // 其他情况（添加/编辑）显示正常表单
+                        // Other cases (add/edit) display standard form
                         <Form
                             form={form}
                             layout="vertical"

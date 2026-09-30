@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// 服务器URL配置
+// Server URL configuration
 import { SERVER_URL } from '../../../utils/index'
 
 const DocumentManager = () => {
@@ -21,12 +21,12 @@ const DocumentManager = () => {
   const wsRef = useRef(null);
   const logsEndRef = useRef(null);
 
-  // 获取已上传的文件列表
+  // Get uploaded files list
   useEffect(() => {
     fetchFiles();
     connectWebSocket();
 
-    // 清理函数
+    // Cleanup function
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
@@ -34,14 +34,14 @@ const DocumentManager = () => {
     };
   }, []);
 
-  // 建立WebSocket连接
+  // Establish WebSocket connection
   const connectWebSocket = () => {
     try {
       const wsUrl = SERVER_URL.replace('http', 'ws') + '/ws';
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket连接已建立');
+        console.log('WebSocket connection established');
       };
 
       wsRef.current.onmessage = (event) => {
@@ -49,25 +49,25 @@ const DocumentManager = () => {
           const data = JSON.parse(event.data);
           handleProgressUpdate(data);
         } catch (error) {
-          console.error('解析WebSocket消息失败:', error);
+          console.error('Failed to parse WebSocket message:', error);
         }
       };
 
       wsRef.current.onclose = () => {
-        console.log('WebSocket连接已关闭');
-        // 3秒后尝试重连
+        console.log('WebSocket connection closed');
+        // Reconnect after 3 seconds
         setTimeout(connectWebSocket, 3000);
       };
 
       wsRef.current.onerror = (error) => {
-        console.error('WebSocket错误:', error);
+        console.error('WebSocket error:', error);
       };
     } catch (error) {
-      console.error('WebSocket连接失败:', error);
+      console.error('WebSocket connection failed:', error);
     }
   };
 
-  // 处理进度更新
+  // Process progress update
   const handleProgressUpdate = (data) => {
     switch (data.type) {
       case 'progress':
@@ -97,7 +97,7 @@ const DocumentManager = () => {
           delete updated[data.file_id];
           return updated;
         });
-        // 更新文件列表中的状态
+        // Update file list status
         setFiles(prev => prev.map(file =>
           file.file_id === data.file_id
             ? { ...file, status: 'embedded' }
@@ -110,10 +110,10 @@ const DocumentManager = () => {
           ...prev,
           [data.file_id]: {
             error: data.error,
-            message: `错误: ${data.error}`
+            message: `Error: ${data.error}`
           }
         }));
-        // 更新文件列表中的状态
+        // Update file list status
         setFiles(prev => prev.map(file =>
           file.file_id === data.file_id
             ? { ...file, status: 'error' }
@@ -127,7 +127,7 @@ const DocumentManager = () => {
         setProgressDetails({});
         setSelectedFiles(new Set());
         showNotification(t('files.all_completed'), 'success');
-        fetchFiles(); // 刷新文件列表
+        fetchFiles(); // Refresh file list
         break;
 
       case 'error':
@@ -138,15 +138,15 @@ const DocumentManager = () => {
         break;
 
       case 'log': {
-        // 处理日志消息
+        // Handle log message
         const logEntry = {
           id: Date.now() + Math.random(),
           timestamp: new Date(data.timestamp * 1000).toLocaleTimeString(),
           level: data.level,
           message: data.message
         };
-        setLogs(prev => [...prev.slice(-49), logEntry]); // 保留最近50条日志
-        // 自动滚动到底部
+        setLogs(prev => [...prev.slice(-49), logEntry]); // Keep last 50 logs
+        // Auto scroll to bottom
         setTimeout(() => {
           logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
@@ -262,8 +262,8 @@ return;
     setIsEmbedding(true);
     setEmbeddingProgress({});
     setProgressDetails({});
-    setLogs([]); // 清空之前的日志
-    setShowLogs(true); // 显示日志面板
+    setLogs([]); // Clear previous logs
+    setShowLogs(true); // Show log panel
 
     try {
       const response = await fetch(`${SERVER_URL}/files/embed-with-progress`, {
@@ -282,7 +282,7 @@ return;
 
       if (data.processing) {
         showNotification(t('files.start_processing', { count: data.total_files }), 'info');
-        // 嵌入状态和进度将通过WebSocket更新
+        // Embedding status and progress updated via WebSocket
       } else {
         setIsEmbedding(false);
         showNotification(t('files.processing_failed'), 'error');
@@ -331,7 +331,7 @@ return '0 Bytes';
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto">
 
-        {/* 通知组件 */}
+        {/* Notification component */}
         {notification && (
           <div className={`fixed top-10 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${notification.type === 'success' ? 'bg-green-500 text-white' :
             notification.type === 'error' ? 'bg-red-500 text-white' :
@@ -342,7 +342,7 @@ return '0 Bytes';
           </div>
         )}
 
-        {/* 文件上传区域 */}
+        {/* File upload section */}
         <div className="bg-white rounded-xl p-6 mb-8">
           <div className="text-2xl font-semibold text-gray-900 mb-4">{t('files.upload_document')}</div>
 
@@ -381,7 +381,7 @@ return '0 Bytes';
           </div>
         </div>
 
-        {/* 文件列表和操作区域 */}
+        {/* File list and actions */}
         <div className="bg-white rounded-xl p-6">
           <div className="flex justify-between items-center mb-6">
             <div className="text-2xl font-semibold text-gray-900">{t('files.document_list')}</div>
@@ -492,12 +492,12 @@ return '0 Bytes';
           )}
         </div>
 
-        {/* 进度显示面板 */}
+        {/* Progress display panel */}
         {null && (
           <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('files.processing_progress')}</h3>
 
-            {/* 总体进度条 */}
+            {/* Overall progress bar */}
             {embeddingProgress.total && (
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
@@ -516,10 +516,10 @@ return '0 Bytes';
               </div>
             )}
 
-            {/* 详细进度信息 */}
+            {/* Detailed progress info */}
             {/* {Object.keys(progressDetails).length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-md font-medium text-gray-800">处理详情</h4>
+                <h4 className="text-md font-medium text-gray-800">Processing Details</h4>
                 {Object.entries(progressDetails).map(([fileId, details]) => (
                   <div key={fileId} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center space-x-3">
@@ -555,7 +555,7 @@ return '0 Bytes';
           </div>
         )}
 
-        {/* 日志显示面板 */}
+        {/* Log display panel */}
         {(isEmbedding || showLogs) && logs.length > 0 && (
           <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
             <div className="flex justify-between items-center mb-4">
@@ -589,7 +589,7 @@ return '0 Bytes';
           </div>
         )}
 
-        {/* 嵌入配置面板 */}
+        {/* Embedding config panel */}
         {selectedFiles.size > 0 && !isEmbedding && (
           <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('files.embedding_settings')}</h3>

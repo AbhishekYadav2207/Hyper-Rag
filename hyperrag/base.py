@@ -35,6 +35,8 @@ class QueryParam:
     # Track last retrieved context for downstream validation
     last_context: Optional[Any] = None
     last_context_json: Optional[Any] = None
+    # Deterministic language guard result record
+    language_result: Optional[Any] = None
 
 
 @dataclass

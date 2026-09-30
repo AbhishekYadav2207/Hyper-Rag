@@ -24,6 +24,10 @@ from .response_validator import (
     DeterministicResponseValidator,
     ResponseValidator,
 )
+from .language_guard import (
+    LanguageGuard,
+    LanguageGuardResult,
+)
 
 __version__ = "0.0.1"
 
@@ -49,4 +53,6 @@ __all__ = [
     "BaseResponseValidator",
     "DeterministicResponseValidator",
     "ResponseValidator",
+    "LanguageGuard",
+    "LanguageGuardResult",
 ]

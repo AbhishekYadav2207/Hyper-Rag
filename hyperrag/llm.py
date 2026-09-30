@@ -57,7 +57,11 @@ from .key_pool import (
     parse_retry_after,
 )
 
-from pydantic import BaseModel, Field
+try:
+    from pydantic import BaseModel, Field, ConfigDict
+except ImportError:
+    from pydantic import BaseModel, Field
+    ConfigDict = None
 from typing import List, Dict, Callable, Any
 from .base import BaseKVStorage
 from .utils import compute_args_hash, wrap_embedding_func_with_attrs
@@ -889,6 +893,12 @@ async def bedrock_embedding(
 
 
 class Model(BaseModel):
+    if ConfigDict is not None:
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+    else:
+        class Config:
+            arbitrary_types_allowed = True
+
     gen_func: Callable[[Any], str] = Field(
         ...,
         description="A function that generates the response from the llm. The response must be a string",
@@ -897,9 +907,6 @@ class Model(BaseModel):
         ...,
         description="The arguments to pass to the callable function. Eg. the api key, model name, etc",
     )
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class MultiModel:

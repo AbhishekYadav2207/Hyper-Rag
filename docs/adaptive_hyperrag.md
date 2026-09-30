@@ -375,6 +375,27 @@ python -m pytest tests/unit
 python -m pytest tests/unit/test_adaptive_router.py
 python -m pytest tests/unit/test_retrieval_sufficiency.py
 python -m pytest tests/unit/test_response_validator.py
+python -m pytest tests/unit/test_language_guard.py
 ```
+
+---
+
+## 9. Web UI Adaptive Integration & English-Only Policy
+
+### Web UI Integration
+The Web UI (`web-ui/frontend` and `web-ui/backend`) natively integrates the Adaptive RAG pipeline:
+- **Default Mode**: Adaptive RAG is the default operational mode across both the chat interface and the backend API (`QueryModel.mode = "adaptive"`).
+- **Frontend Transmission**: The frontend sends an explicit payload (`mode: "adaptive"`) when executing queries.
+- **Canonical Routing**: The backend server calls `rag.aquery()` / `rag.astream_query()` with `QueryParam(mode="adaptive")`, which dispatches directly to `AdaptiveRouter` in `hyperrag/adaptive_router.py`.
+- **Metadata Visibility**: The backend emits structured metadata including `adaptive_decision`, `validation`, and `language_guard` results alongside the answer.
+
+### English-Only Output Policy
+All user-facing prose, UI text, API responses, generated answers, and internal documentation are strictly English-only:
+- **`LanguageGuard`**: A deterministic in-process script analyzer (`hyperrag/language_guard.py`) verifies that output answers do not contain CJK or non-Latin prose.
+- **Zero LLM Judge Overhead**: Language compliance is verified deterministically without secondary LLM invocations or rewriting.
+
+### Existing-Data Validation Methodology
+- Verification uses existing repository fixtures, mock databases (`hyperrag_cache/mock`), and unit tests.
+- **No External Maritime Corpus**: Validation is strictly self-contained within project-owned data and does not reference or depend upon external datasets.
 
 

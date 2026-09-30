@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-测试文件上传时使用文件名前5个字符作为数据库名的功能
+Test database name generation using first 5 characters of filename during upload.
 """
 
 import asyncio
@@ -9,87 +9,97 @@ import sys
 import tempfile
 from pathlib import Path
 
-# 添加当前目录到路径
+# Ensure UTF-8 output on Windows console
+if sys.platform == "win32":
+    try:
+        if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+# Add current directory to sys.path
 sys.path.append(str(Path(__file__).parent))
 
 from file_manager import FileManager
 
 
 async def test_database_name_generation():
-    """测试数据库名生成功能"""
-    print("开始测试数据库名生成功能...")
+    """Test database name generation functionality"""
+    print("Starting database name generation test...")
     
-    # 创建临时目录作为存储目录
+    # Create temporary directory as storage directory
     with tempfile.TemporaryDirectory() as temp_dir:
-        # 创建文件管理器实例
-        db_path = os.path.join(temp_dir, "test_files.db")
+        # Create FileManager instance
+        metadata_file = os.path.join(temp_dir, "test_metadata.json")
         storage_dir = os.path.join(temp_dir, "uploads")
-        file_manager = FileManager(storage_dir=storage_dir, db_path=db_path)
+        file_manager = FileManager(storage_dir=storage_dir, metadata_file=metadata_file)
         
-        # 测试用例
+        # Test cases
         test_cases = [
             ("hello_world.txt", "hello"),
-            ("测试文档.pdf", "测试文档"),
+            ("test_doc.pdf", "test_"),
             ("AI-Report-2024.docx", "AIRep"),
             ("123ABC.txt", "123AB"),
             ("a.txt", "a"),
-            ("@#$%^.txt", "default"),  # 特殊字符会被清理，所以会使用默认值
-            ("用户手册V1.0.md", "用户手册"),
-            ("Python编程指南.pdf", "Pytho"),
+            ("@#$%^.txt", "default"),  # Special characters cleaned, default used
+            ("user_manual_v1.0.md", "user_"),
+            ("Python_Guide.pdf", "Pytho"),
             ("report-final-version.txt", "repor"),
-            ("中文测试文档123.docx", "中文测试文"),
+            ("sample_test_doc_123.docx", "sampl"),
         ]
         
-        print("\n测试文件名到数据库名的映射:")
+        print("\nTesting filename to database name mapping:")
         print("-" * 50)
         
         for filename, expected_db_name in test_cases:
-            # 生成数据库名
+            # Generate database name
             actual_db_name = file_manager.generate_database_name(filename)
             
-            # 显示结果
-            status = "✓" if actual_db_name == expected_db_name else "✗"
-            print(f"{status} {filename:25} -> {actual_db_name:8} (期望: {expected_db_name})")
+            # Display results
+            status = "PASS" if actual_db_name == expected_db_name else "FAIL"
+            print(f"[{status}] {filename:25} -> {actual_db_name:8} (expected: {expected_db_name})")
             
             if actual_db_name != expected_db_name:
-                print(f"   错误: 期望 '{expected_db_name}', 但得到 '{actual_db_name}'")
+                print(f"   Error: expected '{expected_db_name}', got '{actual_db_name}'")
         
         print("\n" + "-" * 50)
         
-        # 测试实际文件上传
-        print("\n测试文件上传功能:")
+        # Test file upload
+        print("\nTesting file upload functionality:")
         test_files = [
             ("hello_world.txt", "Hello, World! This is a test file."),
-            ("测试文档.txt", "这是一个中文测试文档。"),
+            ("test_doc.txt", "This is an English test document."),
             ("AIReport.pdf", "This is an AI report content."),
         ]
         
         for filename, content in test_files:
             try:
-                # 模拟文件上传
+                # Simulate file upload
                 file_content = content.encode('utf-8')
                 result = await file_manager.save_uploaded_file(file_content, filename)
                 
-                print(f"✓ 上传成功: {filename}")
-                print(f"  文件ID: {result['file_id']}")
-                print(f"  数据库名: {result['database_name']}")
-                print(f"  文件大小: {result['file_size']} bytes")
+                print(f"[PASS] Uploaded successfully: {filename}")
+                print(f"  File ID: {result['file_id']}")
+                print(f"  Database Name: {result['database_name']}")
+                print(f"  File Size: {result['file_size']} bytes")
                 print()
                 
             except Exception as e:
-                print(f"✗ 上传失败: {filename} - {str(e)}")
+                print(f"[FAIL] Upload failed: {filename} - {str(e)}")
         
-        # 获取所有文件并显示
+        # Retrieve all files
         all_files = file_manager.get_all_files()
-        print("所有上传的文件:")
+        print("All uploaded files:")
         print("-" * 70)
-        print(f"{'文件名':20} {'数据库名':10} {'大小':8} {'状态':8}")
+        print(f"{'Filename':20} {'Database':10} {'Size':8} {'Status':8}")
         print("-" * 70)
         
         for file_info in all_files:
             print(f"{file_info['filename']:20} {file_info['database_name']:10} {file_info['file_size']:8} {file_info['status']:8}")
         
-        print(f"\n测试完成! 共上传 {len(all_files)} 个文件")
+        print(f"\nTest finished! Total uploaded: {len(all_files)} files")
 
 
 if __name__ == "__main__":

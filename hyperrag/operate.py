@@ -90,7 +90,7 @@ async def _handle_entity_additional_properties(
     use_llm_func: callable = global_config["llm_model_func"]
     llm_max_tokens = global_config["llm_model_max_token_size"]
     tiktoken_model_name = global_config["tiktoken_model_name"]
-    summary_max_tokens = global_config["entity_additional_properties_to_max_tokens"] # 可能需要修改 entity_properties_summary_to_max_tokens
+    summary_max_tokens = global_config["entity_additional_properties_to_max_tokens"] # May adjust entity_properties_summary_to_max_tokens
 
     tokens = encode_string_by_tiktoken(additional_properties, model_name=tiktoken_model_name)
     if len(tokens) < summary_max_tokens:  # No need for summary
@@ -120,7 +120,7 @@ async def _handle_relation_summary(
     use_llm_func: callable = global_config["llm_model_func"]
     llm_max_tokens = global_config["llm_model_max_token_size"]
     tiktoken_model_name = global_config["tiktoken_model_name"]
-    summary_max_tokens = global_config["relation_summary_to_max_tokens"]  # 可能需要修改  relation_summary_to_max_tokens
+    summary_max_tokens = global_config["relation_summary_to_max_tokens"]  # May adjust relation_summary_to_max_tokens
 
     tokens = encode_string_by_tiktoken(description, model_name=tiktoken_model_name)
     if len(tokens) < summary_max_tokens:  # No need for summary
@@ -150,7 +150,7 @@ async def _handle_relation_keywords_summary(
     use_llm_func: callable = global_config["llm_model_func"]
     llm_max_tokens = global_config["llm_model_max_token_size"]
     tiktoken_model_name = global_config["tiktoken_model_name"]
-    summary_max_tokens = global_config["relation_keywords_to_max_tokens"]  # 可能需要修改relation_keywords_summary_to_max_tokens
+    summary_max_tokens = global_config["relation_keywords_to_max_tokens"]  # May adjust relation_keywords_summary_to_max_tokens
 
     tokens = encode_string_by_tiktoken(keywords, model_name=tiktoken_model_name)
     if len(tokens) < summary_max_tokens:  # No need for summary
@@ -211,7 +211,7 @@ async def _handle_single_relationship_extraction_low(
     edge_keywords = clean_str(record_attributes[-2])
     edge_source_id = chunk_key
     weight = (
-        float(record_attributes[-1]) if is_float_regex(record_attributes[-1]) else 0.75 # 如果无权重，则默认0.75
+        float(record_attributes[-1]) if is_float_regex(record_attributes[-1]) else 0.75 # Default to 0.75 if no weight provided
     )
     return dict(
         entityN=entities,
@@ -311,7 +311,7 @@ async def _merge_nodes_then_upsert(
     description = await _handle_entity_summary(
         entity_name, description, global_config
     )
-    additional_properties = await _handle_entity_additional_properties(  # 应该新建一个合并附属信息的函数，以及prompt
+    additional_properties = await _handle_entity_additional_properties(  # Merge additional properties
         entity_name, additional_properties, global_config
     )
     node_data = dict(
@@ -367,16 +367,16 @@ async def _merge_edges_then_upsert(
                 need_insert_id,
                 {
                     "source_id": source_id,
-                    "description": "UNKNOWN", # 超边描述
-                    "additional_properties": "UNKNOWN", # 超边关键词
+                    "description": "UNKNOWN", # Hyperedge description
+                    "additional_properties": "UNKNOWN", # Hyperedge keywords
                     "entity_type": "UNKNOWN",
                 },
             )
-    description = await _handle_relation_summary(  # 应该重新写一个针对超边描述进行合并的函数
+    description = await _handle_relation_summary(  # Merge hyperedge descriptions
         id_set, description, global_config
     )
 
-    filter_keywords = await _handle_relation_keywords_summary(  # 应该重新写一个针对超边的关键词进行合并的函数
+    filter_keywords = await _handle_relation_keywords_summary(  # Merge hyperedge keywords
         id_set, keywords, global_config
     )
 
@@ -522,14 +522,14 @@ async def extract_entities(
             already_processed % len(PROMPTS["process_tickers"])
         ]
 
-        # 计算用时
+        # Calculate elapsed time
         current_time = datetime.now()
         time = current_time - begin_time
         total_seconds = int(time.total_seconds())
         hours = total_seconds // 3600
         minutes = (total_seconds % 3600) // 60
         seconds = total_seconds % 60
-        # 进度条
+        # Progress bar
         percent = (already_processed / len(ordered_chunks)) * 100
         bar_length = int(50 * already_processed // len(ordered_chunks))
         bar = '=' * bar_length + '-' * (50 - bar_length)
@@ -708,7 +708,7 @@ async def _build_entity_query_context(
 ```
 """
     
-    # 返回包含上下文字符串和结构化数据的字典
+    # Return dictionary containing context string and structured data
     return {
         "context": context_string,
         "entities": [
@@ -960,7 +960,7 @@ async def _build_relation_query_context(
 ```
 """
 
-    # 返回包含上下文字符串和结构化数据的字典
+    # Return dictionary containing context string and structured data
     return {
         "context": context_string,
         "entities": [
@@ -1300,11 +1300,11 @@ async def hyper_query_stream(
     sys_prompt = sys_prompt_temp.format(
         context_data=context, response_type=query_param.response_type
     )
-    # ====== 1) 流式接口不建议支持 json（json 必须完整结构，不适合边吐边返回）======
+    # ====== 1) Streaming interface: json return type not supported ======
     if query_param.return_type == "json":
         raise ValueError("Streaming does not support return_type='json'. Use return_type='text'.")
 
-    # ====== 2) 真流式输出：逐 token 产出 ======
+    # ====== 2) True streaming: token-by-token output ======
     async for tok in use_model_stream_func(query + define_str, system_prompt=sys_prompt,):
         if tok:
             yield tok
@@ -1450,7 +1450,7 @@ async def graph_query(
     global_config: dict,
 ):
     """
-    检索和返回 hypergraph db 中的成对关系
+    Retrieve and return pairwise relations in hypergraph DB
     """
     use_model_func = global_config["llm_model_func"]
     kw_prompt_temp = PROMPTS["keywords_extraction"]
@@ -1480,11 +1480,11 @@ async def graph_query(
             print(f"JSON parsing error: {e}")
             return PROMPTS["fail_response"]
 
-    # 只处理二元关系
+    # Only process binary relations
     def filter_pairwise_edges(edges):
         return [e for e in edges if isinstance(e.get("id_set"), (list, tuple)) and len(e["id_set"]) == 2]
 
-    # 获取所有相关的二元关系
+    # Retrieve all related binary relations
     relation_context = None
     if relation_keywords:
         results = await relationships_vdb.query(relation_keywords, top_k=query_param.top_k)
@@ -1501,7 +1501,7 @@ async def graph_query(
             for k, v, d in zip(results, edge_datas, edge_degree)
             if v is not None
         ]
-        # 只保留二元关系
+        # Only retain binary relations
         edge_datas = filter_pairwise_edges(edge_datas)
         edge_datas = sorted(
             edge_datas, key=lambda x: (x["rank"], x["weight"]), reverse=True
@@ -1511,7 +1511,7 @@ async def graph_query(
             key=lambda x: x["description"],
             max_token_size=query_param.max_token_for_relation_context,
         )
-        # 相关实体
+        # Related entities
         entity_names = set()
         for e in edge_datas:
             for f in e["id_set"]:
@@ -1533,7 +1533,7 @@ async def graph_query(
             key=lambda x: x["description"],
             max_token_size=query_param.max_token_for_entity_context,
         )
-        # 相关文本
+        # Related text units
         text_units = [
             split_string_by_multi_markers(dp["source_id"], [GRAPH_FIELD_SEP])
             for dp in edge_datas
@@ -1556,7 +1556,7 @@ async def graph_query(
             max_token_size=query_param.max_token_for_text_unit,
         )
         all_text_units = [t["data"] for t in all_text_units]
-        # 格式化 context
+        # Format context
         relations_section_list = [
             ["id", "entity set", "description", "keywords", "weight", "rank"]
         ]
@@ -1738,13 +1738,13 @@ def combine_contexts(relation_context, entity_context):
 
 def remove_after_sources(input_string: str) -> str:
     """
-    删除字符串中 '-----Sources-----' 及其之后的所有内容。
+    Delete '-----Sources-----' and everything after it from the string.
     """
-    # 找到 '-----Sources-----' 的起始位置
+    # Find start position of '-----Sources-----'
     index = input_string.find("-----Sources-----")
-    if index != -1:  # 如果找到了该字符串
-        return input_string[:index]  # 返回该位置之前的内容
-    return input_string  # 如果没有找到，返回原始字符串
+    if index != -1:  # If string found
+        return input_string[:index]  # Return content before that position
+    return input_string  # If not found, return original string
 
 async def naive_query(
     query,
@@ -1802,7 +1802,7 @@ async def llm_query(
     global_config: dict,
 ):
     """
-    只调用 LLM，不进行任何数据查询。
+    Call LLM directly without any data retrieval.
     """
     use_model_func = global_config["llm_model_func"]
     sys_prompt_temp = PROMPTS["rag_response"]
@@ -1890,7 +1890,8 @@ async def hyper_query_lite_stream(
     global_config: dict,
 ):
     """
-    hyper_query_lite 的流式版本：逻辑与 hyper_query_lite 相同，只把最后一步 LLM 生成改成 yield token
+    Streaming version of hyper_query_lite: identical logic to hyper_query_lite,
+    converting final LLM generation step into yield token.
     """
     entity_context, entity_keywords = await hyper_retrieve_lite(
         query,
@@ -1919,7 +1920,7 @@ async def naive_query_stream(
     global_config: dict,
 ):
     """
-    naive_query 的流式版本：先做 chunk 检索拿到 section，然后用 LLM stream 输出答案
+    Streaming version of naive_query: retrieves chunks first, then streams LLM answer.
     """
     use_model_func = global_config["llm_model_func"]
     use_model_stream_func = global_config.get("llm_model_stream_func", None)
@@ -1969,7 +1970,7 @@ async def llm_query_stream(
     global_config: dict,
 ):
     """
-    llm_query 的流式版本：不检索，直接按 rag_response（空 context）走流式输出
+    Streaming version of llm_query: no retrieval, streams LLM output directly with empty context.
     """
     use_model_stream_func = global_config.get("llm_model_stream_func", None)
     if use_model_stream_func is None:

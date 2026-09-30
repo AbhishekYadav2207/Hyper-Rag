@@ -10,15 +10,22 @@ import aiofiles
 import asyncio
 
 class FileManager:
-    def __init__(self, storage_dir: str = "uploads", metadata_file: str = "file_metadata.json"):
+    def __init__(
+        self,
+        storage_dir: str = "uploads",
+        metadata_file: str = "file_metadata.json",
+        db_path: Optional[str] = None,
+    ):
+        if db_path is not None:
+            metadata_file = db_path
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(exist_ok=True)
         
-        # 元数据文件路径
+        # Metadata file path
         self.metadata_file = Path(metadata_file)
         self.metadata_lock = asyncio.Lock()
         
-        # 支持的文件类型
+        # Supported file types
         self.supported_extensions = {'.txt', '.pdf', '.docx', '.md', '.doc'}
         self.supported_mime_types = {
             'text/plain', 'application/pdf', 
@@ -26,17 +33,17 @@ class FileManager:
             'application/msword', 'text/markdown'
         }
         
-        # 初始化元数据文件
+        # Initialize metadata file
         self._init_metadata_file()
     
     def _init_metadata_file(self):
-        """初始化元数据文件"""
+        """Initialize metadata file if not exists."""
         if not self.metadata_file.exists():
             with open(self.metadata_file, 'w', encoding='utf-8') as f:
                 json.dump({}, f, ensure_ascii=False, indent=2)
     
     def _load_metadata(self) -> Dict:
-        """加载元数据"""
+        """Load metadata dictionary."""
         try:
             with open(self.metadata_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -44,16 +51,16 @@ class FileManager:
             return {}
     
     def _save_metadata(self, metadata: Dict):
-        """保存元数据"""
+        """Save metadata dictionary."""
         with open(self.metadata_file, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
     
     def generate_file_id(self) -> str:
-        """生成唯一的文件ID"""
+        """Generate unique file ID."""
         return str(uuid.uuid4())
     
     def get_file_hash(self, file_path: str) -> str:
-        """计算文件的MD5哈希值"""
+        """Calculate MD5 hash of file."""
         hash_md5 = hashlib.md5()
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
@@ -61,27 +68,22 @@ class FileManager:
         return hash_md5.hexdigest()
     
     def is_supported_file(self, filename: str, mime_type: str = None) -> bool:
-        """检查文件是否支持"""
+        """Check if file type is supported."""
         ext = Path(filename).suffix.lower()
         return ext in self.supported_extensions or (mime_type and mime_type in self.supported_mime_types)
     
     def generate_database_name(self, filename: str) -> str:
-        """根据文件名前5个字符生成数据库名"""
-        # 去除文件扩展名
+        """Generate database name using first 5 valid characters of filename."""
         name_without_ext = Path(filename).stem
-        # 只保留字母、数字和中文字符，移除特殊字符
-        clean_name = re.sub(r'[^\w\u4e00-\u9fff]', '', name_without_ext)
-        # 取前5个字符
+        clean_name = re.sub(r'[^\w]', '', name_without_ext)
         db_name = clean_name[:5]
-        # 如果少于5个字符，用原文件名
         if len(db_name) < 1:
             db_name = "default"
         return db_name
     
     async def save_uploaded_file(self, file_content: bytes, original_filename: str) -> Dict:
-        """保存上传的文件"""
+        """Save uploaded file and record metadata."""
         try:
-            # 根据文件扩展名推断MIME类型
             ext = Path(original_filename).suffix.lower()
             mime_type_map = {
                 '.txt': 'text/plain',
@@ -93,26 +95,21 @@ class FileManager:
             mime_type = mime_type_map.get(ext, 'application/octet-stream')
             
             if not self.is_supported_file(original_filename, mime_type):
-                raise ValueError(f"不支持的文件类型: {original_filename}")
+                raise ValueError(f"Unsupported file type: {original_filename}")
             
-            # 生成数据库名
             database_name = self.generate_database_name(original_filename)
             
-            # 生成文件ID和存储路径
             file_id = self.generate_file_id()
             file_ext = Path(original_filename).suffix
             filename = f"{file_id}{file_ext}"
             file_path = self.storage_dir / filename
             
-            # 异步保存文件
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(file_content)
             
-            # 计算文件大小和哈希
             file_size = len(file_content)
             file_hash = self.get_file_hash(str(file_path))
             
-            # 保存到元数据文件
             async with self.metadata_lock:
                 metadata = self._load_metadata()
                 
@@ -146,13 +143,12 @@ class FileManager:
                 }
                 
         except Exception as e:
-            # 如果保存失败，删除已创建的文件
             if 'file_path' in locals() and file_path.exists():
                 file_path.unlink()
             raise e
     
     def get_all_files(self) -> List[Dict]:
-        """获取所有文件列表"""
+        """Get list of all uploaded files."""
         metadata = self._load_metadata()
         files = []
         
@@ -170,12 +166,11 @@ class FileManager:
                 "error_message": file_record.get("error_message")
             })
         
-        # 按上传时间降序排序
         files.sort(key=lambda x: x["upload_time"], reverse=True)
         return files
     
     def get_file_by_id(self, file_id: str) -> Optional[Dict]:
-        """根据ID获取文件信息"""
+        """Get file info by ID."""
         metadata = self._load_metadata()
         file_record = metadata.get(file_id)
         
@@ -197,7 +192,7 @@ class FileManager:
         }
     
     def update_file_status(self, file_id: str, status: str, error_message: str = None):
-        """更新文件状态"""
+        """Update status of a file."""
         metadata = self._load_metadata()
         
         if file_id in metadata:
@@ -210,7 +205,7 @@ class FileManager:
             self._save_metadata(metadata)
     
     def delete_file(self, file_id: str) -> bool:
-        """删除文件"""
+        """Delete file and its metadata."""
         metadata = self._load_metadata()
         
         if file_id not in metadata:
@@ -218,25 +213,22 @@ class FileManager:
         
         file_record = metadata[file_id]
         
-        # 删除文件
         file_path = Path(file_record["file_path"])
         if file_path.exists():
             file_path.unlink()
         
-        # 删除元数据记录
         del metadata[file_id]
         self._save_metadata(metadata)
         
         return True
     
     async def read_file_content(self, file_path: str) -> str:
-        """读取文件内容"""
+        """Read text content from file."""
         file_path = Path(file_path)
         
         if not file_path.exists():
-            raise FileNotFoundError(f"文件不存在: {file_path}")
+            raise FileNotFoundError(f"File not found: {file_path}")
         
-        # 根据文件类型选择不同的读取方式
         if file_path.suffix.lower() == '.pdf':
             return self._read_pdf(file_path)
         elif file_path.suffix.lower() in ['.docx']:
@@ -245,10 +237,10 @@ class FileManager:
             async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
                 return await f.read()
         else:
-            raise ValueError(f"不支持的文件类型: {file_path.suffix}")
+            raise ValueError(f"Unsupported file type: {file_path.suffix}")
     
     def _read_pdf(self, file_path: Path) -> str:
-        """读取PDF文件内容"""
+        """Read PDF file content."""
         try:
             import PyPDF2
             with open(file_path, 'rb') as file:
@@ -258,15 +250,15 @@ class FileManager:
                     text += page.extract_text() + "\n"
                 return text
         except Exception as e:
-            raise ValueError(f"PDF文件读取失败: {str(e)}")
+            raise ValueError(f"Failed to read PDF file: {str(e)}")
     
     def _read_docx(self, file_path: Path) -> str:
-        """读取DOCX文件内容"""
+        """Read DOCX file content."""
         try:
             import docx2txt
             return docx2txt.process(str(file_path))
         except Exception as e:
-            raise ValueError(f"DOCX文件读取失败: {str(e)}")
+            raise ValueError(f"Failed to read DOCX file: {str(e)}")
 
-# 全局文件管理器实例
-file_manager = FileManager() 
+# Global file manager instance
+file_manager = FileManager()
