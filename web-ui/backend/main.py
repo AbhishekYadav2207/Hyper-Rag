@@ -2,8 +2,12 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, W
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .db import get_hypergraph, getFrequentVertices, get_vertices, get_hyperedges, get_vertice, get_vertice_neighbor, get_hyperedge_neighbor_server, add_vertex, add_hyperedge, delete_vertex, delete_hyperedge, update_vertex, update_hyperedge, get_hyperedge_detail, db_manager
-from .file_manager import file_manager
+try:
+    from .db import get_hypergraph, getFrequentVertices, get_vertices, get_hyperedges, get_vertice, get_vertice_neighbor, get_hyperedge_neighbor_server, add_vertex, add_hyperedge, delete_vertex, delete_hyperedge, update_vertex, update_hyperedge, get_hyperedge_detail, db_manager
+    from .file_manager import file_manager
+except (ImportError, ValueError):
+    from db import get_hypergraph, getFrequentVertices, get_vertices, get_hyperedges, get_vertice, get_vertice_neighbor, get_hyperedge_neighbor_server, add_vertex, add_hyperedge, delete_vertex, delete_hyperedge, update_vertex, update_hyperedge, get_hyperedge_detail, db_manager
+    from file_manager import file_manager
 import json
 import os
 import asyncio
@@ -57,8 +61,53 @@ except ImportError as e:
     GENERIC_INGESTION_AVAILABLE = False
 
 
-# Set file paths
-SETTINGS_FILE = "settings.json"
+# Set file paths and canonical settings store
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+_repo_root = os.path.dirname(os.path.dirname(_backend_dir))
+SETTINGS_FILE = os.path.join(_repo_root, "settings.json")
+_legacy_settings = os.path.join(_backend_dir, "settings.json")
+if not os.path.exists(SETTINGS_FILE) and os.path.exists(_legacy_settings):
+    try:
+        import shutil
+        shutil.copy2(_legacy_settings, SETTINGS_FILE)
+    except Exception:
+        pass
+
+import re
+
+def sanitize_error_message(msg: str) -> str:
+    """Sanitize error messages to prevent exposing API keys or auth headers."""
+    if not msg:
+        return ""
+    text = str(msg)
+    text = re.sub(r'Bearer\s+[A-Za-z0-9_\-\.]+', 'Bearer [REDACTED]', text, flags=re.IGNORECASE)
+    text = re.sub(r'Authorization:\s*[^\s]+', 'Authorization: [REDACTED]', text, flags=re.IGNORECASE)
+    text = re.sub(r'sk-[A-Za-z0-9_\-\.]{8,}', '[REDACTED_API_KEY]', text)
+    text = re.sub(r'key-[A-Za-z0-9_\-\.]{8,}', '[REDACTED_API_KEY]', text)
+    return text
+
+def mask_key(key: Optional[str]) -> str:
+    """Return masked representation of an API key, e.g. ••••••••••••abcd."""
+    if not key or not isinstance(key, str):
+        return ""
+    stripped = key.strip()
+    if not stripped:
+        return ""
+    if len(stripped) <= 8:
+        return "••••••••"
+    return f"••••••••••••{stripped[-4:]}"
+
+def load_raw_settings() -> dict:
+    """Load settings from SETTINGS_FILE directly without exposing in API."""
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+                if isinstance(saved, dict):
+                    return saved
+        except Exception as e:
+            main_logger.warning(f"Error reading {SETTINGS_FILE}: {e}")
+    return {}
 
 app = FastAPI()
 
@@ -293,24 +342,30 @@ async def delete_hyperedge_endpoint(hyperedge_id: str, database: str = None):
 # Settings related API endpoints
 
 class SettingsModel(BaseModel):
-    apiKey: str = ""
-    modelProvider: str = "openrouter"
-    modelName: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
-    baseUrl: str = "https://openrouter.ai/api/v1"
-    selectedDatabase: str = ""
-    maxTokens: int = 2000
-    temperature: float = 0.7
-    # HyperRAG embedding model settings
-    embeddingModel: str = "mistral-embed"
-    embeddingBaseUrl: str = "https://api.mistral.ai/v1"
-    embeddingApiKey: str = ""
-    embeddingDim: int = 1024
+    apiKey: Optional[str] = None
+    clearApiKey: Optional[bool] = False
+    modelProvider: Optional[str] = "openrouter"
+    modelName: Optional[str] = "nvidia/nemotron-3-ultra-550b-a55b:free"
+    baseUrl: Optional[str] = "https://openrouter.ai/api/v1"
+    
+    embeddingApiKey: Optional[str] = None
+    clearEmbeddingApiKey: Optional[bool] = False
+    embeddingProvider: Optional[str] = "mistral"
+    embeddingModel: Optional[str] = "mistral-embed"
+    embeddingBaseUrl: Optional[str] = "https://api.mistral.ai/v1"
+    embeddingDim: Optional[int] = 1024
+    
+    selectedDatabase: Optional[str] = "mock"
+    maxTokens: Optional[int] = 2000
+    temperature: Optional[float] = 0.7
 
 class APITestModel(BaseModel):
-    apiKey: str
-    baseUrl: str
-    modelName: str
-    modelProvider: str
+    apiKey: Optional[str] = ""
+    baseUrl: Optional[str] = ""
+    modelName: Optional[str] = ""
+    modelProvider: Optional[str] = "openrouter"
+    testType: Optional[str] = "llm"  # "llm" or "embedding"
+    embeddingDim: Optional[int] = 1024
 
 class DatabaseTestModel(BaseModel):
     database: str
@@ -318,67 +373,123 @@ class DatabaseTestModel(BaseModel):
 @app.get("/settings")
 async def get_settings():
     """
-    Get system settings
+    Get system settings.
+    Full secret keys are NEVER returned in settings responses.
+    Returns masked previews and configured flags.
     """
     try:
-        if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-            # Normalize embedding settings if legacy text-embedding-3-small
-            if settings.get("embeddingModel") in ("text-embedding-3-small", None) or settings.get("embeddingDim") in (1536, None):
-                settings["embeddingModel"] = "mistral-embed"
-                settings["embeddingDim"] = 1024
-                settings["embeddingBaseUrl"] = "https://api.mistral.ai/v1"
-            # Do not return sensitive info such as API keys
-            settings_safe = settings.copy()
-            if 'apiKey' in settings_safe:
-                settings_safe['apiKey'] = '***' if settings_safe['apiKey'] else ''
-            if 'embeddingApiKey' in settings_safe:
-                settings_safe['embeddingApiKey'] = '***' if settings_safe['embeddingApiKey'] else ''
-            return settings_safe
-        else:
-            # Return default settings
-            return {
-                "apiKey": "",
-                "modelProvider": "openrouter",
-                "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
-                "baseUrl": "https://openrouter.ai/api/v1",
-                "selectedDatabase": "mock",
-                "maxTokens": 2000,
-                "temperature": 0.7,
-                "embeddingModel": "mistral-embed",
-                "embeddingBaseUrl": "https://api.mistral.ai/v1",
-                "embeddingApiKey": "",
-                "embeddingDim": 1024
-            }
+        settings = get_effective_settings()
+        api_key = settings.get("apiKey", "")
+        emb_api_key = settings.get("embeddingApiKey", "")
+        
+        safe_response = {
+            "modelProvider": settings.get("modelProvider", "openrouter"),
+            "modelName": settings.get("modelName", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+            "baseUrl": settings.get("baseUrl", "https://openrouter.ai/api/v1"),
+            "apiKey": mask_key(api_key),
+            "apiKeyConfigured": bool(api_key.strip() if isinstance(api_key, str) else api_key),
+            "apiKeyPreview": mask_key(api_key),
+            "openrouter_configured": bool(api_key.strip() if isinstance(api_key, str) else api_key),
+            "openrouter_key_preview": mask_key(api_key),
+            
+            "embeddingProvider": settings.get("embeddingProvider", "mistral"),
+            "embeddingModel": settings.get("embeddingModel", "mistral-embed"),
+            "embeddingBaseUrl": settings.get("embeddingBaseUrl", "https://api.mistral.ai/v1"),
+            "embeddingApiKey": mask_key(emb_api_key),
+            "embeddingApiKeyConfigured": bool(emb_api_key.strip() if isinstance(emb_api_key, str) else emb_api_key),
+            "embeddingApiKeyPreview": mask_key(emb_api_key),
+            "mistral_configured": bool(emb_api_key.strip() if isinstance(emb_api_key, str) else emb_api_key),
+            "mistral_key_preview": mask_key(emb_api_key),
+            "embeddingDim": settings.get("embeddingDim", 1024),
+            
+            "selectedDatabase": settings.get("selectedDatabase", "mock"),
+            "maxTokens": settings.get("maxTokens", 2000),
+            "temperature": settings.get("temperature", 0.7),
+        }
+        return safe_response
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return {"success": False, "message": sanitize_error_message(str(e))}
 
 @app.post("/settings")
 async def save_settings(settings: SettingsModel):
     """
-    Save system settings
+    Save system settings securely.
+    WebUI Settings is the single runtime source of truth.
+    Credentials survive restart and are kept out of frontend bundles and GET responses.
     """
     try:
-        settings_dict = settings.dict()
-        
-        # If apiKey is ***, keep original apiKey unchanged
-        if settings_dict.get('apiKey') == '***':
-            # Read existing apiKey from settings
-            if os.path.exists(SETTINGS_FILE):
-                with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                    existing_settings = json.load(f)
-                # Keep original apiKey
-                settings_dict['apiKey'] = existing_settings.get('apiKey', '')
-            else:
-                # If no existing settings file, set to empty string
-                settings_dict['apiKey'] = ''
-        
+        raw_existing = load_raw_settings()
+        updated = raw_existing.copy()
+
+        # Handle apiKey (LLM Provider Key)
+        if settings.clearApiKey or settings.apiKey == "__CLEAR__":
+            updated["apiKey"] = ""
+        elif settings.apiKey is not None:
+            new_key = settings.apiKey.strip()
+            # If masked placeholder sent, preserve existing
+            if new_key.startswith("••") or new_key == "***" or new_key == mask_key(raw_existing.get("apiKey", "")):
+                pass
+            elif new_key:
+                updated["apiKey"] = new_key
+
+        # Handle embeddingApiKey (Embedding Provider Key)
+        if settings.clearEmbeddingApiKey or settings.embeddingApiKey == "__CLEAR__":
+            updated["embeddingApiKey"] = ""
+        elif settings.embeddingApiKey is not None:
+            new_emb_key = settings.embeddingApiKey.strip()
+            # If masked placeholder sent, preserve existing
+            if new_emb_key.startswith("••") or new_emb_key == "***" or new_emb_key == mask_key(raw_existing.get("embeddingApiKey", "")):
+                pass
+            elif new_emb_key:
+                updated["embeddingApiKey"] = new_emb_key
+
+        # Update other fields
+        if settings.modelProvider:
+            updated["modelProvider"] = settings.modelProvider
+        if settings.modelName:
+            updated["modelName"] = settings.modelName
+        if settings.baseUrl:
+            updated["baseUrl"] = settings.baseUrl
+        if settings.embeddingProvider:
+            updated["embeddingProvider"] = settings.embeddingProvider
+        if settings.embeddingModel:
+            updated["embeddingModel"] = settings.embeddingModel
+        if settings.embeddingBaseUrl:
+            updated["embeddingBaseUrl"] = settings.embeddingBaseUrl
+        if settings.embeddingDim:
+            if updated.get("embeddingModel") == "mistral-embed" and settings.embeddingDim != 1024:
+                raise ValueError("Mistral embeddings require 1024 dimensions.")
+            updated["embeddingDim"] = settings.embeddingDim
+        if settings.selectedDatabase is not None:
+            updated["selectedDatabase"] = settings.selectedDatabase
+        if settings.maxTokens is not None:
+            updated["maxTokens"] = settings.maxTokens
+        if settings.temperature is not None:
+            updated["temperature"] = settings.temperature
+
+        # Persist securely
+        os.makedirs(os.path.dirname(os.path.abspath(SETTINGS_FILE)), exist_ok=True)
         with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(settings_dict, f, ensure_ascii=False, indent=2)
-        return {"success": True, "message": "Settings saved successfully"}
+            json.dump(updated, f, ensure_ascii=False, indent=2)
+        try:
+            if hasattr(os, "chmod"):
+                os.chmod(SETTINGS_FILE, 0o600)
+        except Exception:
+            pass
+
+        # Invalidate cached hyperrag instances so new settings take effect immediately
+        hyperrag_instances.clear()
+
+        return {
+            "success": True,
+            "message": "Settings saved successfully",
+            "apiKeyConfigured": bool(updated.get("apiKey")),
+            "apiKeyPreview": mask_key(updated.get("apiKey")),
+            "embeddingApiKeyConfigured": bool(updated.get("embeddingApiKey")),
+            "embeddingApiKeyPreview": mask_key(updated.get("embeddingApiKey")),
+        }
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return {"success": False, "message": sanitize_error_message(str(e))}
 
 @app.get("/databases")
 async def get_databases():
@@ -411,37 +522,71 @@ async def get_databases():
 @app.post("/test-api")
 async def test_api_connection(api_test: APITestModel):
     """
-    Test API connection
+    Test API connection for LLM or Embedding provider.
+    Never exposes API keys or Authorization headers in response or logs.
     """
     try:
         from openai import OpenAI
+        raw_settings = load_raw_settings()
         
-        # Test according to different model providers
-        if api_test.modelProvider == "openai":
-            client = OpenAI(
-                api_key=api_test.apiKey,
-                base_url=api_test.baseUrl
+        is_embedding = (
+            api_test.testType == "embedding" or 
+            api_test.modelProvider in ("mistral", "embedding")
+        )
+        
+        if is_embedding:
+            # Embedding test (Mistral)
+            key_to_use = api_test.apiKey.strip() if api_test.apiKey else ""
+            if not key_to_use or key_to_use.startswith("••") or key_to_use == "***":
+                key_to_use = raw_settings.get("embeddingApiKey", "").strip()
+            
+            if not key_to_use:
+                return {
+                    "success": False,
+                    "message": "Mistral API key is not configured. Open Settings to add your API key."
+                }
+            
+            base_url = api_test.baseUrl or raw_settings.get("embeddingBaseUrl") or "https://api.mistral.ai/v1"
+            model_name = api_test.modelName or raw_settings.get("embeddingModel") or "mistral-embed"
+            
+            client = OpenAI(api_key=key_to_use, base_url=base_url)
+            res = client.embeddings.create(
+                model=model_name,
+                input=["test connection"],
             )
-            
-            # Send a simple test request
-            response = client.chat.completions.create(
-                model=api_test.modelName,
-                messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=10
-            )
-            
-            return {"success": True, "message": "API connection test successful"}
-            
-        elif api_test.modelProvider == "anthropic":
-            # For Anthropic, test logic can be added
-            return {"success": True, "message": "Anthropic API connection test successful"}
-            
+            dim = len(res.data[0].embedding) if res.data else 0
+            return {
+                "success": True,
+                "message": f"Connection successful! Mistral embedding returned {dim}-dim vector."
+            }
         else:
-            # For other providers, run generic test
-            return {"success": True, "message": "API connection test successful"}
+            # LLM test (OpenRouter / OpenAI)
+            key_to_use = api_test.apiKey.strip() if api_test.apiKey else ""
+            if not key_to_use or key_to_use.startswith("••") or key_to_use == "***":
+                key_to_use = raw_settings.get("apiKey", "").strip()
             
+            if not key_to_use:
+                return {
+                    "success": False,
+                    "message": "OpenRouter API key is not configured. Open Settings to add your API key."
+                }
+            
+            base_url = api_test.baseUrl or raw_settings.get("baseUrl") or "https://openrouter.ai/api/v1"
+            model_name = api_test.modelName or raw_settings.get("modelName") or "nvidia/nemotron-3-ultra-550b-a55b:free"
+            
+            client = OpenAI(api_key=key_to_use, base_url=base_url)
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=5,
+            )
+            return {
+                "success": True,
+                "message": f"Connection successful! LLM responded (model: {model_name})."
+            }
     except Exception as e:
-        return {"success": False, "message": f"API connection test failed: {str(e)}"}
+        err_clean = sanitize_error_message(str(e))
+        return {"success": False, "message": f"Connection failed: {err_clean}"}
 
 @app.post("/test-database")
 async def test_database_connection(db_test: DatabaseTestModel):
@@ -477,11 +622,17 @@ _root_cache = os.path.join(_repo_root, "hyperrag_cache")
 hyperrag_working_dir = _root_cache if os.path.exists(_root_cache) else "hyperrag_cache"
 
 def get_effective_settings() -> dict:
+    """
+    Runtime source of truth for WebUI settings.
+    Precedence: WebUI Settings (settings.json) > Defaults.
+    Credentials MUST come from WebUI settings. .env is NOT the runtime credential source.
+    """
     base_settings = {
         "modelProvider": "openrouter",
         "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
         "baseUrl": "https://openrouter.ai/api/v1",
         "apiKey": "",
+        "embeddingProvider": "mistral",
         "embeddingModel": "mistral-embed",
         "embeddingBaseUrl": "https://api.mistral.ai/v1",
         "embeddingApiKey": "",
@@ -490,41 +641,15 @@ def get_effective_settings() -> dict:
         "maxTokens": 2000,
         "temperature": 0.7,
     }
-    try:
-        from my_config import (
-            OPENROUTER_MODEL, OPENROUTER_BASE_URL, OPENROUTER_API_KEY,
-            EMB_MODEL, EMB_BASE_URL, EMB_API_KEY, EMB_DIM
-        )
-        base_settings.update({
-            "modelName": OPENROUTER_MODEL,
-            "baseUrl": OPENROUTER_BASE_URL,
-            "apiKey": OPENROUTER_API_KEY,
-            "embeddingModel": EMB_MODEL,
-            "embeddingBaseUrl": EMB_BASE_URL,
-            "embeddingApiKey": EMB_API_KEY,
-            "embeddingDim": EMB_DIM,
-        })
-    except Exception as e:
-        main_logger.warning(f"Could not load settings from my_config: {e}")
 
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                saved = json.load(f)
-                if saved and isinstance(saved, dict):
-                    # Canonical Mistral embeddings if legacy text-embedding-3-small or missing
-                    if saved.get("embeddingModel") in ("text-embedding-3-small", None) or saved.get("embeddingDim") in (1536, None):
-                        saved["embeddingModel"] = base_settings["embeddingModel"]
-                        saved["embeddingDim"] = base_settings["embeddingDim"]
-                        saved["embeddingBaseUrl"] = base_settings["embeddingBaseUrl"]
-                    if not saved.get("embeddingApiKey"):
-                        saved["embeddingApiKey"] = base_settings["embeddingApiKey"]
-                    if not saved.get("embeddingBaseUrl"):
-                        saved["embeddingBaseUrl"] = base_settings["embeddingBaseUrl"]
-                    base_settings.update(saved)
-                    return base_settings
-        except Exception:
-            pass
+    saved = load_raw_settings()
+    if saved:
+        # Enforce canonical Mistral embeddings if legacy text-embedding-3-small or missing
+        if saved.get("embeddingModel") in ("text-embedding-3-small", None) or saved.get("embeddingDim") in (1536, None):
+            saved["embeddingModel"] = "mistral-embed"
+            saved["embeddingDim"] = 1024
+            saved["embeddingBaseUrl"] = "https://api.mistral.ai/v1"
+        base_settings.update(saved)
 
     return base_settings
 
@@ -538,10 +663,12 @@ async def get_hyperrag_llm_func(prompt, system_prompt=None, history_messages=[],
             main_logger.info(f"System prompt length: {len(system_prompt)} chars")
         
         settings = get_effective_settings()
+        api_key = settings.get("apiKey", "").strip()
+        if not api_key:
+            raise ValueError("OpenRouter API key is not configured. Open Settings to add your API key.")
         
         model_name = settings.get("modelName", "nvidia/nemotron-3-ultra-550b-a55b:free")
-        api_key = settings.get("apiKey")
-        base_url = settings.get("baseUrl")
+        base_url = settings.get("baseUrl", "https://openrouter.ai/api/v1")
         
         main_logger.info(f"Using model: {model_name}, API base: {base_url}")
         
@@ -559,7 +686,7 @@ async def get_hyperrag_llm_func(prompt, system_prompt=None, history_messages=[],
         return response
         
     except Exception as e:
-        main_logger.error(f"LLM call failed: {str(e)}")
+        main_logger.error(f"LLM call failed: {sanitize_error_message(str(e))}")
         raise
 
 async def get_hyperrag_llm_stream_func(prompt, system_prompt=None, history_messages=[], **kwargs):
@@ -569,9 +696,12 @@ async def get_hyperrag_llm_stream_func(prompt, system_prompt=None, history_messa
     try:
         from hyperrag.llm import openrouter_mistral_stream_if_cache
         settings = get_effective_settings()
+        api_key = settings.get("apiKey", "").strip()
+        if not api_key:
+            raise ValueError("OpenRouter API key is not configured. Open Settings to add your API key.")
+        
         model_name = settings.get("modelName", "nvidia/nemotron-3-ultra-550b-a55b:free")
-        api_key = settings.get("apiKey")
-        base_url = settings.get("baseUrl")
+        base_url = settings.get("baseUrl", "https://openrouter.ai/api/v1")
         
         async for tok in openrouter_mistral_stream_if_cache(
             prompt=prompt,
@@ -584,8 +714,9 @@ async def get_hyperrag_llm_stream_func(prompt, system_prompt=None, history_messa
         ):
             yield tok
     except Exception as e:
-        main_logger.error(f"LLM streaming failed: {str(e)}")
-        yield f"[STREAM_ERROR: {e}]"
+        clean_err = sanitize_error_message(str(e))
+        main_logger.error(f"LLM streaming failed: {clean_err}")
+        yield f"[STREAM_ERROR: {clean_err}]"
 
 async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
     """
@@ -596,19 +727,13 @@ async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
         main_logger.info(f"Total chunk length: {sum(len(text) for text in texts)} chars")
         
         settings = get_effective_settings()
+        api_key = settings.get("embeddingApiKey", "").strip()
+        if not api_key:
+            raise ValueError("Mistral API key is not configured. Open Settings to add your API key.")
         
         embedding_model = settings.get("embeddingModel") or "mistral-embed"
         embedding_dim = settings.get("embeddingDim", 1024)
-        api_key = settings.get("embeddingApiKey")
         base_url = settings.get("embeddingBaseUrl") or "https://api.mistral.ai/v1"
-        
-        # Fallback to my_config.EMB_API_KEY if embeddingApiKey is empty
-        if not api_key:
-            try:
-                from my_config import EMB_API_KEY
-                api_key = EMB_API_KEY
-            except Exception:
-                pass
         
         main_logger.info(f"Using embedding model: {embedding_model}, dim: {embedding_dim}")
         
@@ -623,7 +748,8 @@ async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
         return embeddings
         
     except Exception as e:
-        main_logger.error(f"Text embedding failed: {str(e)}")
+        clean_err = sanitize_error_message(str(e))
+        main_logger.error(f"Text embedding failed: {clean_err}")
         raise
 
 def get_or_create_hyperrag(database: str = None):
@@ -798,7 +924,11 @@ async def query_hyperrag(query: QueryModel):
         }
         
     except Exception as e:
-        return {"success": False, "message": f"Query failed: {str(e)}"}
+        err_msg = str(e)
+        sanitized = sanitize_error_message(err_msg)
+        if "API key is not configured" in err_msg:
+            return {"success": False, "message": sanitized}
+        return {"success": False, "message": f"Query failed: {sanitized}"}
 
 @app.post("/hyperrag/query_stream")
 async def query_hyperrag_stream(query: QueryModel):
@@ -829,11 +959,14 @@ async def query_hyperrag_stream(query: QueryModel):
                         yield token
                     await asyncio.sleep(0)
             except Exception as stream_err:
-                yield f"\n[STREAM_ERROR: {stream_err}]"
+                clean_err = sanitize_error_message(str(stream_err))
+                yield f"\n[STREAM_ERROR: {clean_err}]"
 
         return StreamingResponse(stream_generator(), media_type="text/plain; charset=utf-8")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query stream failed: {str(e)}")
+        clean_err = sanitize_error_message(str(e))
+        status_code = 400 if "API key is not configured" in str(e) else 500
+        raise HTTPException(status_code=status_code, detail=f"Query stream failed: {clean_err}")
 
 @app.get("/hyperrag/status")
 async def get_hyperrag_status(database: str = None):
@@ -1031,6 +1164,8 @@ async def embed_files(request: FileEmbedRequest):
                             max_records=50,
                             chunk_token_size=request.chunk_size,
                             chunk_overlap_token_size=request.chunk_overlap,
+                            llm_func=get_hyperrag_llm_func,
+                            embedding_func=get_hyperrag_embedding_func,
                         )
                     )
                     await pipeline.ingest_file(
@@ -1405,6 +1540,8 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
                             max_records=50,
                             chunk_token_size=request.chunk_size,
                             chunk_overlap_token_size=request.chunk_overlap,
+                            llm_func=get_hyperrag_llm_func,
+                            embedding_func=get_hyperrag_embedding_func,
                         )
                     )
                     await pipeline.ingest_file(

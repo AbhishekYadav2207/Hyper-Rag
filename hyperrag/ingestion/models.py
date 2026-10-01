@@ -129,3 +129,5 @@ class IngestionConfig:
     chunk_overlap_token_size: int = 100
     dry_run: bool = False
     target_database_name: Optional[str] = None
+    llm_func: Optional[Any] = None
+    embedding_func: Optional[Any] = None

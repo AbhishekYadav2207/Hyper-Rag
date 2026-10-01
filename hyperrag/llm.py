@@ -147,8 +147,12 @@ async def _execute_openrouter_completion(
     Internal runner for OpenRouter chat completion with automatic API-key rotation.
     NO fallback to Mistral LLM.
     """
-    pool = get_openrouter_key_pool()
+    api_key = kwargs.pop("api_key", None)
     base_url = kwargs.pop("base_url", None) or OPENROUTER_BASE_URL
+    if api_key:
+        pool = APIKeyPool("OpenRouter", [api_key])
+    else:
+        pool = kwargs.pop("key_pool", None) or get_openrouter_key_pool()
 
     async def _send_request(api_key: str) -> str:
         client = get_async_client(api_key, base_url)
@@ -374,6 +378,7 @@ async def openrouter_mistral_stream_if_cache(
     """
     model = kwargs.pop("model", None) or OPENROUTER_MODEL
     base_url = kwargs.pop("base_url", None) or OPENROUTER_BASE_URL
+    api_key = kwargs.pop("api_key", None)
     hashing_kv: BaseKVStorage = kwargs.pop("hashing_kv", None)
 
     messages = []
@@ -393,7 +398,10 @@ async def openrouter_mistral_stream_if_cache(
                 yield cached_text[i : i + chunk_size]
             return
 
-    pool = get_openrouter_key_pool()
+    if api_key:
+        pool = APIKeyPool("OpenRouter", [api_key])
+    else:
+        pool = kwargs.pop("key_pool", None) or get_openrouter_key_pool()
     retries_limit = max(10, pool.total * 3)
     attempt = 0
     stream = None
@@ -530,7 +538,11 @@ def openrouter_mistral_complete_sync(
                 raise ValueError("OpenRouter response contained no usable content")
         return content
 
-    pool = get_openrouter_key_pool()
+    api_key = kwargs.pop("api_key", None)
+    if api_key:
+        pool = APIKeyPool("OpenRouter", [api_key])
+    else:
+        pool = kwargs.pop("key_pool", None) or get_openrouter_key_pool()
     return execute_with_key_rotation_sync(pool, _send_sync)
 
 
@@ -752,8 +764,8 @@ async def openai_embedding(
             dtype=np.float32,
         )
 
-    # If caller specifically provided an override key not in pool
-    if api_key and api_key not in pool.keys:
+    # If caller specifically provided an override key
+    if api_key:
         temp_pool = APIKeyPool("Embeddings", [api_key])
         return await execute_with_key_rotation(temp_pool, _send_embedding)
 

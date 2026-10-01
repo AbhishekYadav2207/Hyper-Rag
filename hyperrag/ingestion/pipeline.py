@@ -226,38 +226,45 @@ class GenericIngestionPipeline:
         })
 
         try:
-            from my_config import EMB_MODEL, EMB_DIM, EMB_BASE_URL, EMB_API_KEY
             from hyperrag import HyperRAG
             from hyperrag.utils import EmbeddingFunc
             from hyperrag.llm import openai_embedding, openrouter_mistral_complete_if_cache
 
-            # Validate embedding dimension
-            if EMB_DIM != 1024:
-                raise ValueError(
-                    f"Invalid embedding dimension {EMB_DIM}. Project requires 1024-dimensional Mistral embeddings."
-                )
+            llm_func = self.config.llm_func
+            emb_func = self.config.embedding_func
+            emb_dim = 1024
 
-            async def llm_func(prompt, system_prompt=None, history_messages=None, **kwargs):
-                return await openrouter_mistral_complete_if_cache(
-                    prompt,
-                    system_prompt=system_prompt,
-                    history_messages=history_messages or [],
-                    **kwargs,
-                )
+            if llm_func is None:
+                async def default_llm(prompt, system_prompt=None, history_messages=None, **kwargs):
+                    return await openrouter_mistral_complete_if_cache(
+                        prompt,
+                        system_prompt=system_prompt,
+                        history_messages=history_messages or [],
+                        **kwargs,
+                    )
+                llm_func = default_llm
 
-            async def emb_func(texts: list[str]):
-                return await openai_embedding(
-                    texts,
-                    model=EMB_MODEL,
-                    api_key=EMB_API_KEY,
-                    base_url=EMB_BASE_URL,
-                )
+            if emb_func is None:
+                from my_config import EMB_MODEL, EMB_DIM, EMB_BASE_URL, EMB_API_KEY
+                emb_dim = EMB_DIM
+                if emb_dim != 1024:
+                    raise ValueError(
+                        f"Invalid embedding dimension {emb_dim}. Project requires 1024-dimensional Mistral embeddings."
+                    )
+                async def default_emb(texts: list[str]):
+                    return await openai_embedding(
+                        texts,
+                        model=EMB_MODEL,
+                        api_key=EMB_API_KEY,
+                        base_url=EMB_BASE_URL,
+                    )
+                emb_func = default_emb
 
             rag = HyperRAG(
                 working_dir=str(cache_db_dir),
                 llm_model_func=llm_func,
                 embedding_func=EmbeddingFunc(
-                    embedding_dim=EMB_DIM,
+                    embedding_dim=emb_dim,
                     max_token_size=8192,
                     func=emb_func,
                 ),

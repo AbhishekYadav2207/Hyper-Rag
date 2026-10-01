@@ -141,21 +141,32 @@ An embedded interactive Swagger UI (`http://localhost:8000/docs`).
 Configuration panel for model providers and system state.
 
 ### Configurable Options
-- **LLM Provider**:
-  - Model Name: `nvidia/nemotron-3-ultra-550b-a55b:free`
-  - Base URL: `https://openrouter.ai/api/v1`
-- **Embedding Provider**:
-  - Model Name: `mistral-embed`
-  - Dimensions: `1024` (fixed)
+- **LLM Provider (Generation)**:
+  - Provider: OpenRouter (Default: `nvidia/nemotron-3-ultra-550b-a55b:free`)
+  - API Base URL: `https://openrouter.ai/api/v1`
+  - OpenRouter API Key: Masked password input (e.g., `<OPENROUTER_API_KEY>`)
+  - Test LLM Connection: Verifies connectivity without exposing credentials.
+- **Embedding Provider (Retrieval & Indexing)**:
+  - Provider: Mistral AI (Canonical: `mistral-embed`)
+  - Dimensions: `1024` (Required for Hyper-RAG indices)
   - Base URL: `https://api.mistral.ai/v1`
+  - Mistral API Key: Masked password input (e.g., `<MISTRAL_API_KEY>`)
+  - Test Embedding Connection: Verifies embedding generation and dimension checks.
+- **Runtime Precedence & Source of Truth**:
+  - The WebUI Settings interface is the **authoritative runtime source of truth**.
+  - Runtime Precedence: `WebUI Settings value > missing credential error`.
+  - `.env` is **not** the normal runtime credential source for the WebUI. If a key is omitted in Settings, the UI reports a clear error: `"OpenRouter API key is not configured. Open Settings to add your API key."` rather than silently reading `.env`.
 - **Security & Key Masking**:
-  - All API keys are masked as `sk-or-***` or `***`. Real credentials are never sent to the browser in plaintext.
+  - All API keys are masked as `••••••••••••abcd` and stored server-side in `settings.json` with restricted permissions.
+  - `GET /settings` returns only configuration status (`apiKeyConfigured: true`) and masked previews, never full secrets.
+  - Raw credentials are never embedded in frontend bundles, logs, or URL parameters.
+- **Dynamic Updates**:
+  - Saving new credentials takes effect immediately on subsequent queries without restarting the backend.
 - **Tracked Template Configuration**:
   - `settings.example.json` is provided in the repository root as a tracked canonical template. Copy it to `settings.json` (ignored by git) to customize local overrides:
     ```bash
     cp settings.example.json settings.json
     ```
-- **Reset Knowledge Base**: Button to wipe current cached databases and start fresh.
 
 ---
 

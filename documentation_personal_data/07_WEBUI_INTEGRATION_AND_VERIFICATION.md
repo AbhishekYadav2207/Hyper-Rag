@@ -172,3 +172,40 @@ if __name__ == "__main__":
 - `scratch/tsbc_query1_thinking.png`: Proves initial loading state triggered.
 - `scratch/tsbc_query1_answered.png`: Proves full prose answer rendered cleanly.
 - `console_logs`: Proves 0 runtime uncaught JavaScript exceptions.
+
+---
+
+## 4. API Key Management Architecture (WebUI Settings Source of Truth)
+
+Hyper-RAG enforces a strict server-side credential management architecture where the **WebUI Settings interface is the authoritative runtime source of truth**:
+
+```text
+WebUI Settings (/#/Setting)
+          │ (Masked input, password fields)
+          ▼
+POST /settings (Over HTTPS / Local IPC)
+          │ (Server-side validation & atomic write)
+          ▼
+Server-Side settings.json (0600 permissions, gitignored)
+          │ (Dynamic lazy loading per request)
+          ▼
+Runtime Client Initializer
+   ├─► OpenRouter LLM Client (<OPENROUTER_API_KEY>)
+   └─► Mistral Embedding Client (<MISTRAL_API_KEY>)
+```
+
+### Precedence and Security Rules
+1. **WebUI Settings is Authoritative**:
+   - `WebUI Settings value > missing credential / configuration error`.
+   - `.env` is **not** the normal runtime credential source for the WebUI. If no key is configured in WebUI Settings, the system will not silently pull keys from `.env`; it returns an explicit error prompting the user to configure Settings.
+2. **Distinct Multi-Provider Credentials**:
+   - **LLM Provider**: OpenRouter API Key (default model: `nvidia/nemotron-3-ultra-550b-a55b:free`, base URL: `https://openrouter.ai/api/v1`).
+   - **Embedding Provider**: Mistral API Key (canonical model: `mistral-embed`, 1024 dimensions, base URL: `https://api.mistral.ai/v1`).
+3. **No Secret Leaks to Frontend**:
+   - `GET /settings` returns masked preview strings (e.g. `••••••••••••abcd`) and boolean flags (`apiKeyConfigured: true`). Full secret keys are never returned.
+   - Raw credentials are never stored in `localStorage` or `sessionStorage`.
+4. **Dynamic Client Instantiation**:
+   - Clients are created lazily at runtime. Updating credentials in the Settings UI immediately takes effect on the next query or embedding operation without restarting the server.
+5. **Connection Testing**:
+   - Both LLM and Embedding connections can be tested independently from the Settings UI via `POST /test-api`.
+
