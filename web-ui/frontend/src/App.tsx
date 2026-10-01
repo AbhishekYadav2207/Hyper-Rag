@@ -1,15 +1,7 @@
-import BasicLayout from './layout/BasicLayout'
+import AppLayout from './layout/AppLayout'
 
 const App = () => {
-  return (
-    <div
-      style={{
-        height: '100vh'
-      }}
-    >
-      <BasicLayout />
-    </div>
-  )
+  return <AppLayout />
 }
 
 export default App

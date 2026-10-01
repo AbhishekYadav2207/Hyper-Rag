@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { storeGlobalUser } from '../../../store/globalUser';
 import HyperGraph from '../../../components/HyperGraph';
 import DatabaseSelector from '../../../components/DatabaseSelector';
+import { PageWrapper, PageHeader } from '../../../components/PageLayout';
 import { DatabaseOutlined } from '@ant-design/icons';
 import { SERVER_URL } from '../../../utils';
 
@@ -178,76 +179,72 @@ const GraphPage = () => {
   }
 
   return (
-    <>
-      <div className='m-4' style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span>{t('graph.hypergraph_database')}</span>
-        <DatabaseSelector
-          mode="compact"
-          showRefresh={false}
-          size="middle"
-          onChange={onDatabaseChange}
-        />
-
-        <span className='ml-4'>{t('graph.select_entity')}</span>
-        <Select
-          value={key}
-          style={{ width: 300 }}
-          showSearch
-          loading={verticesLoading}
-          placeholder={t('graph.select_entity_placeholder')}
-          onChange={setKey}
-          onPopupScroll={e => {
-            const target = e.target;
-            if (target.scrollTop + target.offsetHeight >= target.scrollHeight - 10) {
-              if (verticesList.length < verticesTotal && !verticesLoading) {
-                loadVertices(verticesPage + 1, true);
-              }
-            }
-          }}
-        >
-          {verticesList.map(vertexKey => (
-            <Select.Option key={vertexKey} value={vertexKey}>
-              {vertexKey}
-            </Select.Option>
-          ))}
-        </Select>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
-        {/* Display hypergraph using HyperGraph component */}
-        <div style={{ width: '70%' }}>
+    <PageWrapper>
+      <PageHeader
+        title={t('graph.hypergraph_database') || 'Hypergraph Visualization'}
+        subtitle={`Exploring: ${storeGlobalUser.selectedDatabase}`}
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{t('graph.select_entity')}:</span>
+            <Select
+              value={key}
+              style={{ width: 240 }}
+              showSearch
+              loading={verticesLoading}
+              placeholder={t('graph.select_entity_placeholder')}
+              onChange={setKey}
+              size="small"
+              onPopupScroll={e => {
+                const target = e.target as HTMLElement;
+                if (target.scrollTop + target.offsetHeight >= target.scrollHeight - 10) {
+                  if (verticesList.length < verticesTotal && !verticesLoading) {
+                    loadVertices(verticesPage + 1, true);
+                  }
+                }
+              }}
+            >
+              {verticesList.map(vertexKey => (
+                <Select.Option key={vertexKey} value={vertexKey}>
+                  {vertexKey}
+                </Select.Option>
+              ))}
+            </Select>
+          </div>
+        }
+      />
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
           <HyperGraph
             vertexId={key}
             database={storeGlobalUser.selectedDatabase}
-            height="calc(100vh - 100px)"
+            height="100%"
             width="100%"
             showTooltip={true}
             graphId="graph-page-hypergraph"
           />
         </div>
-
-        {/* Entity detail card */}
-        <Card 
+        <Card
           title={t('graph.entity_details')}
-          style={{ width: '28%', height: '600px', overflow: 'auto' }}
+          size="small"
+          style={{ width: '280px', overflow: 'auto', borderLeft: '1px solid var(--border-subtle)', borderRadius: 0, flexShrink: 0 }}
         >
           <p><strong>{t('graph.entity_name')}:</strong> {item.entity_name}</p>
           <p><strong>{t('graph.entity_type')}:</strong> <Tag color="blue">{item.entity_type}</Tag></p>
           <p><strong>{t('graph.description')}:</strong></p>
-          <ul>
+          <ul style={{ paddingLeft: '16px', marginTop: '4px' }}>
             {item.descriptions.map((desc, idx) => (
-              <li key={idx}>{desc}</li>
+              <li key={idx} style={{ fontSize: '12px', marginBottom: '4px' }}>{desc}</li>
             ))}
           </ul>
           <p><strong>{t('graph.properties')}:</strong></p>
-          <ul>
+          <ul style={{ paddingLeft: '16px', marginTop: '4px' }}>
             {item.properties.map((prop, idx) => (
-              <li key={idx}>{prop}</li>
+              <li key={idx} style={{ fontSize: '12px', marginBottom: '4px' }}>{prop}</li>
             ))}
           </ul>
         </Card>
       </div>
-    </>
+    </PageWrapper>
   );
 };
 

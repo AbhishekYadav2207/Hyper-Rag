@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import LanguageSelector from '../../components/LanguageSelector'
+import { PageWrapper, PageHeader } from '../../components/PageLayout'
 import { SERVER_URL } from '../../utils'
 
 const { Title, Text } = Typography
@@ -296,15 +297,13 @@ const Setting: React.FC = () => {
   }, [])
 
   return (
-    <div className="m-2">
+    <PageWrapper>
+      <PageHeader
+        title={t('settings.title') || 'Settings'}
+        subtitle={t('settings.subtitle') || 'Configure LLM provider, API key, and available query modes'}
+      />
+      <div style={{ overflow: 'auto', flex: 1, padding: '24px' }}>
       <Card>
-        <div className="mb-4">
-          <div className="flex items-center text-2xl font-bold">
-            <SettingOutlined style={{ marginRight: '8px' }} />
-            {t('settings.title')}
-          </div>
-          <Text type="secondary">{t('settings.subtitle')}</Text>
-        </div>
 
         <Form form={form} layout="vertical" onFinish={saveSettings} initialValues={defaultSettings}>
           {/* System configuration section */}
@@ -563,7 +562,8 @@ const Setting: React.FC = () => {
           </Form.Item>
         </Form>
       </Card>
-    </div>
+      </div>
+    </PageWrapper>
   )
 }
 

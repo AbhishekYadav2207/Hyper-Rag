@@ -32,6 +32,7 @@ import { observer } from 'mobx-react';
 import { useTranslation } from 'react-i18next';
 import { storeGlobalUser } from '../../../store/globalUser';
 import DatabaseSelector from '../../../components/DatabaseSelector';
+import { PageWrapper, PageHeader } from '../../../components/PageLayout';
 import { SERVER_URL } from '../../../utils';
 
 const { Text } = Typography;
@@ -666,23 +667,21 @@ return;
     };
 
     return (
-        <div>
-            {/* Top database selector */}
-            <Card style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <h3 style={{ margin: 0 }}>{t('database.title')}</h3>
-                        <DatabaseSelector
-                            mode="select"
-                            // showRefresh={true}
-                            size="middle"
-                            onChange={onDatabaseChange}
-                        />
-                    </div>
-                </div>
-
-                {storeGlobalUser.selectedDatabase && (
-                    <Row gutter={16} style={{ marginTop: 16 }}>
+        <PageWrapper>
+            <PageHeader
+                title={t('database.title') || 'Hypergraph Database'}
+                subtitle={storeGlobalUser.selectedDatabase ? `Database: ${storeGlobalUser.selectedDatabase}` : 'Select a knowledge base to explore'}
+                actions={
+                    <DatabaseSelector
+                        mode="select"
+                        size="middle"
+                        onChange={onDatabaseChange}
+                    />
+                }
+            />
+            <div style={{ overflow: 'auto', flex: 1, padding: '16px 24px' }}>
+            {storeGlobalUser.selectedDatabase && (
+                    <Row gutter={16} style={{ marginBottom: 16 }}>
                         <Col span={6}>
                             <Statistic title={t('database.entity_count')} value={verticesPagination.total} prefix={<DatabaseOutlined />} />
                         </Col>
@@ -691,7 +690,6 @@ return;
                         </Col>
                     </Row>
                 )}
-            </Card>
 
             {/* Data table section */}
             {storeGlobalUser.selectedDatabase ? (
@@ -929,7 +927,8 @@ return;
                     )}
                 </Spin>
             </Modal>
-        </div>
+            </div>
+        </PageWrapper>
     );
 };
 

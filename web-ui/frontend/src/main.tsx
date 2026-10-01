@@ -5,6 +5,7 @@ import { router } from '../config/routes'
 
 import Loading from './components/loading'
 import './styles/tailwind.css'
+import './styles/design-system.css'
 import './i18n'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
