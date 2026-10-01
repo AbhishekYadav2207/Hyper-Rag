@@ -14,7 +14,9 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-/datasets
+/datasets/*
+!datasets/__init__.py
+!datasets/tsbc_maritime/
 dist/
 downloads/
 eggs/
@@ -197,3 +199,4 @@ test_cache/
 /logs/
 *validation*.log
 *validation_benchmark*.json
+/datasets/*
