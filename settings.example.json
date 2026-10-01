@@ -1,0 +1,13 @@
+{
+  "modelProvider": "openrouter",
+  "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "baseUrl": "https://openrouter.ai/api/v1",
+  "apiKey": "your-openrouter-api-key-here",
+  "embeddingModel": "mistral-embed",
+  "embeddingBaseUrl": "https://api.mistral.ai/v1",
+  "embeddingApiKey": "your-mistral-api-key-here",
+  "embeddingDim": 1024,
+  "selectedDatabase": "mock",
+  "maxTokens": 2000,
+  "temperature": 0.7
+}

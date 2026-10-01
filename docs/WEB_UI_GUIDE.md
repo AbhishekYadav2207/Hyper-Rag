@@ -150,6 +150,11 @@ Configuration panel for model providers and system state.
   - Base URL: `https://api.mistral.ai/v1`
 - **Security & Key Masking**:
   - All API keys are masked as `sk-or-***` or `***`. Real credentials are never sent to the browser in plaintext.
+- **Tracked Template Configuration**:
+  - `settings.example.json` is provided in the repository root as a tracked canonical template. Copy it to `settings.json` (ignored by git) to customize local overrides:
+    ```bash
+    cp settings.example.json settings.json
+    ```
 - **Reset Knowledge Base**: Button to wipe current cached databases and start fresh.
 
 ---

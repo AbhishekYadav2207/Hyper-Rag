@@ -182,6 +182,7 @@ cython_debug/
 
 # web-ui
 settings.json
+!settings.example.json
 web-ui/backend/settings.json    
 hyperrag_cache/
 web-ui/backend/hyperrag_cache/
