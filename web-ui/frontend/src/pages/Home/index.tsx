@@ -211,6 +211,7 @@ return 'You'
                             index === conv.messages.length - 1
                                 ? {
                                     ...msg,
+                                    content: content !== undefined && content !== null ? content : msg.content,
                                     entities: extraData?.entities || msg.entities || [],
                                     hyperedges: extraData?.hyperedges || msg.hyperedges || [],
                                     text_units: extraData?.text_units || msg.text_units || [],
@@ -291,7 +292,7 @@ return
                     mode1: {
                         name: modeNames[compareMode1] || compareMode1,
                         mode: compareMode1,
-                        response: result1.success ? (result1.response || 'No response content') : `Error: ${result1.message}`,
+                        response: result1.success ? (result1.response || result1.answer || 'No response content') : `Error: ${result1.message}`,
                         entities: result1.entities || [],
                         hyperedges: result1.hyperedges || [],
                         text_units: result1.text_units || [],
@@ -302,7 +303,7 @@ return
                     mode2: {
                         name: modeNames[compareMode2] || compareMode2,
                         mode: compareMode2,
-                        response: result2.success ? (result2.response || 'No response content') : `Error: ${result2.message}`,
+                        response: result2.success ? (result2.response || result2.answer || 'No response content') : `Error: ${result2.message}`,
                         entities: result2.entities || [],
                         hyperedges: result2.hyperedges || [],
                         text_units: result2.text_units || [],
@@ -322,6 +323,8 @@ return
                 updateLastMessage(`Comparative analysis error: ${error instanceof Error ? error.message : 'Unknown error'}`, {
                     isCompare: true
                 })
+            } finally {
+                setIsLoading(false)
             }
         } else {
             // Single mode query
@@ -341,7 +344,7 @@ return
                     }
                     const modeName = modeNames[queryMode] || queryMode
 
-                    const responseContent = data.response || 'No response content'
+                    const responseContent = data.response || data.answer || 'No response content'
 
                     updateLastMessage(responseContent, {
                         entities: data.entities || [],
@@ -357,10 +360,10 @@ return
             } catch (error) {
                 console.error('Error sending message:', error)
                 updateLastMessage(`Sorry, an error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            } finally {
+                setIsLoading(false)
             }
         }
-
-        setIsLoading(false)
     }
 
     const handleKeyPress = (e) => {

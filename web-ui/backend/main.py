@@ -1,5 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from .db import get_hypergraph, getFrequentVertices, get_vertices, get_hyperedges, get_vertice, get_vertice_neighbor, get_hyperedge_neighbor_server, add_vertex, add_hyperedge, delete_vertex, delete_hyperedge, update_vertex, update_hyperedge, get_hyperedge_detail, db_manager
 from .file_manager import file_manager
 import json
@@ -55,8 +57,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Setup frontend static assets
+frontend_dist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
+frontend_assets_dir = os.path.join(frontend_dist_dir, "assets")
+
+if os.path.exists(frontend_assets_dir):
+    app.mount("/assets", StaticFiles(directory=frontend_assets_dir), name="assets")
+
+@app.get("/logo.png")
+async def serve_logo():
+    logo_file = os.path.join(frontend_dist_dir, "logo.png")
+    if os.path.exists(logo_file):
+        return FileResponse(logo_file)
+    raise HTTPException(status_code=404, detail="Logo not found")
+
 @app.get("/")
 async def root():
+    index_file = os.path.join(frontend_dist_dir, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     return {"message": "Hyper-RAG"}
 
 
@@ -262,15 +281,17 @@ async def delete_hyperedge_endpoint(hyperedge_id: str, database: str = None):
 
 class SettingsModel(BaseModel):
     apiKey: str = ""
-    modelProvider: str = "openai"
-    modelName: str = "gpt-5-mini"
-    baseUrl: str = "https://api.openai.com/v1"
+    modelProvider: str = "openrouter"
+    modelName: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
+    baseUrl: str = "https://openrouter.ai/api/v1"
     selectedDatabase: str = ""
     maxTokens: int = 2000
     temperature: float = 0.7
     # HyperRAG embedding model settings
-    embeddingModel: str = "text-embedding-3-small"
-    embeddingDim: int = 1536
+    embeddingModel: str = "mistral-embed"
+    embeddingBaseUrl: str = "https://api.mistral.ai/v1"
+    embeddingApiKey: str = ""
+    embeddingDim: int = 1024
 
 class APITestModel(BaseModel):
     apiKey: str
@@ -290,23 +311,32 @@ async def get_settings():
         if os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
                 settings = json.load(f)
+            # Normalize embedding settings if legacy text-embedding-3-small
+            if settings.get("embeddingModel") in ("text-embedding-3-small", None) or settings.get("embeddingDim") in (1536, None):
+                settings["embeddingModel"] = "mistral-embed"
+                settings["embeddingDim"] = 1024
+                settings["embeddingBaseUrl"] = "https://api.mistral.ai/v1"
             # Do not return sensitive info such as API keys
             settings_safe = settings.copy()
             if 'apiKey' in settings_safe:
                 settings_safe['apiKey'] = '***' if settings_safe['apiKey'] else ''
+            if 'embeddingApiKey' in settings_safe:
+                settings_safe['embeddingApiKey'] = '***' if settings_safe['embeddingApiKey'] else ''
             return settings_safe
         else:
             # Return default settings
             return {
                 "apiKey": "",
-                "modelProvider": "openai",
-                "modelName": "gpt-4o-mini",
-                "baseUrl": "https://api.openai.com/v1",
-                "selectedDatabase": "",
+                "modelProvider": "openrouter",
+                "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
+                "baseUrl": "https://openrouter.ai/api/v1",
+                "selectedDatabase": "mock",
                 "maxTokens": 2000,
                 "temperature": 0.7,
-                "embeddingModel": "text-embedding-3-small",
-                "embeddingDim": 1536
+                "embeddingModel": "mistral-embed",
+                "embeddingBaseUrl": "https://api.mistral.ai/v1",
+                "embeddingApiKey": "",
+                "embeddingDim": 1024
             }
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -434,21 +464,25 @@ _root_cache = os.path.join(_repo_root, "hyperrag_cache")
 hyperrag_working_dir = _root_cache if os.path.exists(_root_cache) else "hyperrag_cache"
 
 def get_effective_settings() -> dict:
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-                if settings and isinstance(settings, dict):
-                    return settings
-        except Exception:
-            pass
+    base_settings = {
+        "modelProvider": "openrouter",
+        "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "apiKey": "",
+        "embeddingModel": "mistral-embed",
+        "embeddingBaseUrl": "https://api.mistral.ai/v1",
+        "embeddingApiKey": "",
+        "embeddingDim": 1024,
+        "selectedDatabase": "mock",
+        "maxTokens": 2000,
+        "temperature": 0.7,
+    }
     try:
         from my_config import (
             OPENROUTER_MODEL, OPENROUTER_BASE_URL, OPENROUTER_API_KEY,
             EMB_MODEL, EMB_BASE_URL, EMB_API_KEY, EMB_DIM
         )
-        return {
-            "modelProvider": "openrouter",
+        base_settings.update({
             "modelName": OPENROUTER_MODEL,
             "baseUrl": OPENROUTER_BASE_URL,
             "apiKey": OPENROUTER_API_KEY,
@@ -456,24 +490,30 @@ def get_effective_settings() -> dict:
             "embeddingBaseUrl": EMB_BASE_URL,
             "embeddingApiKey": EMB_API_KEY,
             "embeddingDim": EMB_DIM,
-            "selectedDatabase": "",
-            "maxTokens": 2000,
-            "temperature": 0.7,
-        }
-    except Exception:
-        return {
-            "modelProvider": "openrouter",
-            "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
-            "baseUrl": "https://openrouter.ai/api/v1",
-            "apiKey": "",
-            "embeddingModel": "mistral-embed",
-            "embeddingBaseUrl": "https://api.mistral.ai/v1",
-            "embeddingApiKey": "",
-            "embeddingDim": 1024,
-            "selectedDatabase": "",
-            "maxTokens": 2000,
-            "temperature": 0.7,
-        }
+        })
+    except Exception as e:
+        main_logger.warning(f"Could not load settings from my_config: {e}")
+
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+                if saved and isinstance(saved, dict):
+                    # Canonical Mistral embeddings if legacy text-embedding-3-small or missing
+                    if saved.get("embeddingModel") in ("text-embedding-3-small", None) or saved.get("embeddingDim") in (1536, None):
+                        saved["embeddingModel"] = base_settings["embeddingModel"]
+                        saved["embeddingDim"] = base_settings["embeddingDim"]
+                        saved["embeddingBaseUrl"] = base_settings["embeddingBaseUrl"]
+                    if not saved.get("embeddingApiKey"):
+                        saved["embeddingApiKey"] = base_settings["embeddingApiKey"]
+                    if not saved.get("embeddingBaseUrl"):
+                        saved["embeddingBaseUrl"] = base_settings["embeddingBaseUrl"]
+                    base_settings.update(saved)
+                    return base_settings
+        except Exception:
+            pass
+
+    return base_settings
 
 async def get_hyperrag_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs) -> str:
     """
@@ -544,11 +584,20 @@ async def get_hyperrag_embedding_func(texts: list[str]) -> np.ndarray:
         
         settings = get_effective_settings()
         
-        embedding_model = settings.get("embeddingModel", "mistral-embed")
-        api_key = settings.get("embeddingApiKey") or settings.get("apiKey")
-        base_url = settings.get("embeddingBaseUrl") or settings.get("baseUrl")
+        embedding_model = settings.get("embeddingModel") or "mistral-embed"
+        embedding_dim = settings.get("embeddingDim", 1024)
+        api_key = settings.get("embeddingApiKey")
+        base_url = settings.get("embeddingBaseUrl") or "https://api.mistral.ai/v1"
         
-        main_logger.info(f"Using embedding model: {embedding_model}")
+        # Fallback to my_config.EMB_API_KEY if embeddingApiKey is empty
+        if not api_key:
+            try:
+                from my_config import EMB_API_KEY
+                api_key = EMB_API_KEY
+            except Exception:
+                pass
+        
+        main_logger.info(f"Using embedding model: {embedding_model}, dim: {embedding_dim}")
         
         embeddings = await openai_embedding(
             texts,
@@ -575,8 +624,8 @@ def get_or_create_hyperrag(database: str = None):
         raise RuntimeError("HyperRAG is not available")
     
     # If no database specified, use default database
-    if database is None:
-        database = db_manager.default_database
+    if not database:
+        database = getattr(db_manager, "default_database", "mock")
         main_logger.info(f"Using default database: {database}")
     
     # Check if instance already exists for this database
@@ -723,6 +772,7 @@ async def query_hyperrag(query: QueryModel):
         return {
             "success": True,
             "response": result.get("response", ""),
+            "answer": result.get("response", ""),
             "entities": result.get("entities", []),
             "hyperedges": result.get("hyperedges", []),
             "text_units": result.get("text_units", []),
@@ -1428,3 +1478,13 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
             "type": "error",
             "error": error_msg
         })
+
+@app.get("/{full_path:path}")
+async def serve_spa_fallback(full_path: str):
+    if full_path.startswith(("db", "hyperrag", "files", "settings", "databases", "docs", "openapi.json", "ws", "test-api")):
+        raise HTTPException(status_code=404, detail="Not Found")
+    index_file = os.path.join(frontend_dist_dir, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Not Found")
+

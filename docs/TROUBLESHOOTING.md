@@ -171,3 +171,27 @@ If a database or vector index becomes corrupted:
      rm -rf ./caches/default ./hyperrag_cache
      ```
 3. Restart the backend. Fresh databases will be initialized automatically.
+
+---
+
+## 6. Web UI & Frontend Diagnostics
+
+### 6.1 Adaptive RAG Stuck on "Thinking..." Even Though Backend Returned HTTP 200
+- **Symptoms**: After submitting a query, the Web UI permanently displays the Adaptive decision badge with `"Thinking..."`, despite the backend logs confirming successful LLM response and `POST /hyperrag/query HTTP/1.1 200 OK`.
+- **Root Cause**:
+  1. **Message Content State Drop**: In `web-ui/frontend/src/pages/Home/index.tsx`, the `updateLastMessage(content, extraData)` function accepted the response `content` string, but neglected to assign `content` to the message object in `conv.messages.map()`. The metadata (`adaptive_decision`, `entities`, etc.) was merged, but `msg.content` remained hardcoded to `'Thinking...'`.
+  2. **Loading State Guard**: If an exception or malformed payload occurred, `isLoading` could remain true if not protected by a `finally { setIsLoading(false) }` block.
+- **Resolution**:
+  1. In `Home/index.tsx`, ensure `content: content !== undefined && content !== null ? content : msg.content` is set in `updateLastMessage`.
+  2. Support both `data.response` and `data.answer` in single and compare modes.
+  3. Wrap queries in `try ... catch ... finally { setIsLoading(false) }`.
+  4. Run `npm run build` in `web-ui/frontend` to update static distribution assets.
+
+### 6.2 Embedding Dimension Mismatch (1024 vs 1536)
+- **Symptoms**: Query embedding generates a 1536-dimensional vector (`text-embedding-3-small`) while stored vector indexes (`vdb_chunks.json`, `vdb_entities.json`, `vdb_relationships.json`) expect 1024 dimensions.
+- **Root Cause**: Stale configuration in `settings.json` or backend defaults specifying `text-embedding-3-small` and dimension `1536` instead of canonical Mistral embeddings.
+- **Resolution**:
+  1. Configure `embeddingModel: "mistral-embed"`, `embeddingBaseUrl: "https://api.mistral.ai/v1"`, and `embeddingDim: 1024` in `settings.json` and `web-ui/backend/main.py`.
+  2. In `get_effective_settings()`, automatically normalize legacy `text-embedding-3-small` or 1536-dim entries to `mistral-embed` and `1024`.
+  3. In `get_hyperrag_embedding_func()`, ensure `EMB_API_KEY` is utilized with Mistral base URL.
+

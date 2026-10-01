@@ -159,7 +159,10 @@ Configuration panel for model providers and system state.
 | Issue | Likely Cause | Solution |
 |---|---|---|
 | **Network Error / Failed to Fetch** | Backend server is not running on port 8000. | Start backend: `python -m uvicorn web-ui.backend.main:app --port 8000`. |
-| **Vite connection refused on 5173** | Frontend dev server is not started. | Run `cd web-ui/frontend && npm run dev`. |
+| **Chat stuck on "Thinking..."** | Message content update omitted in React state. | Resolved: `updateLastMessage` in `Home/index.tsx` assigns `msg.content = content` and backend provides both `response` and `answer` aliases. |
+| **Embedding dimension mismatch (1024 vs 1536)** | Vector DB created with 1024-dim Mistral, but runtime requested 1536-dim OpenAI embedding. | Resolved: Ensure `settings.json` and backend use `mistral-embed` (1024 dims). |
+| **Vite connection refused on 5173** | Frontend dev server is not started. | Run `cd web-ui/frontend && npm run dev` or access directly via `http://127.0.0.1:8000` (FastAPI SPA mount). |
 | **Upload fails with 413 or 500** | Unsupported file format or file locked by another process. | Ensure files are `.txt`, `.pdf`, `.docx`, or `.md`. |
 | **Chat responses take long on complex queries** | Core hypergraph diffusion is running across dense clusters. | This is expected behavior for complex relational reasoning. Check streaming toggle for faster time-to-first-token. |
 | **Empty graph on Visualization page** | No documents have been indexed yet. | Go to `/#/Files`, upload a document, and click `Embed`. |
+

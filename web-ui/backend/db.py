@@ -8,6 +8,7 @@ class DatabaseManager:
         repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         root_cache = os.path.join(repo_root, "hyperrag_cache")
         self.cache_dir = root_cache if os.path.exists(root_cache) else "hyperrag_cache"
+        self.default_database = "mock" if os.path.exists(os.path.join(self.cache_dir, "mock")) else "default"
         
     def get_database(self, database_name=None):
         """Get database instance by name."""
@@ -41,6 +42,8 @@ class DatabaseManager:
                
                 if os.path.isdir(file_path):
                     databases.append(file)
+            # Prioritize mock database if present
+            databases.sort(key=lambda x: 0 if x == "mock" else 1)
         except OSError:
             pass
                 
