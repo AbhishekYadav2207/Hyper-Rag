@@ -362,7 +362,7 @@ return '0 Bytes';
               multiple
               onChange={handleFileSelect}
               className="hidden"
-              accept=".txt,.pdf,.docx,.md"
+              accept=".txt,.pdf,.docx,.md,.json,.jsonl,.csv"
             />
 
             <h3 className="text-xl font-semibold text-gray-700 mb-2">

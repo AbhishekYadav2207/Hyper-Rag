@@ -16,7 +16,9 @@ import {
     Layers,
     BookOpen,
     GitCompare,
+    Upload
 } from 'lucide-react'
+import UploadKnowledgeModal from '../../components/UploadKnowledgeModal'
 import {
     Button,
     Select,
@@ -43,6 +45,7 @@ const HyperRAGHome = () => {
     const [conversations, setConversations] = useState([])
     const [activeConversationId, setActiveConversationId] = useState('')
     const [inputValue, setInputValue] = useState('')
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
     const [queryMode, setQueryMode] = useState('adaptive')
     const [isLoading, setIsLoading] = useState(false)
     const [availableModes, setAvailableModes] = useState(['adaptive', 'hyper', 'hyper-lite', 'naive'])
@@ -590,6 +593,17 @@ return
                                 disabled={false}
                             />
                         </div>
+                        <div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsUploadModalOpen(true)}
+                                className="flex items-center space-x-2 text-blue-600 border-blue-300 hover:bg-blue-50 font-medium px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                            >
+                                <Upload className="w-4 h-4 text-blue-600" />
+                                <span>Upload Knowledge</span>
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -916,6 +930,10 @@ return
                     </div>
                 </div>
             </div>
+            <UploadKnowledgeModal
+                visible={isUploadModalOpen}
+                onClose={() => setIsUploadModalOpen(false)}
+            />
         </div>
     )
 }

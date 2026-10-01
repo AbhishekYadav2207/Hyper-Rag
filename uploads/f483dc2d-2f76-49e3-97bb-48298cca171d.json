@@ -1,0 +1,81 @@
+[
+  {
+    "employee_id": "EMP-001",
+    "full_name": "Elena Rostova",
+    "job_title": "Principal Distributed Systems Architect",
+    "department": "Infrastructure & Cloud",
+    "office_location": "Zurich",
+    "status": "Active",
+    "hire_year": 2021,
+    "clearance_level": "Tier-3",
+    "biography": "Elena Rostova joined NovaTech in 2021 as Principal Systems Architect. She designed the high-throughput telemetry pipeline handling 10 million events per second and previously spearheaded the migration to Kubernetes.",
+    "contact": {
+      "corporate_email": "elena.rostova@novatech-systems.internal",
+      "desk_extension": "4401"
+    },
+    "skills": ["Distributed Systems", "Raft Consensus", "Rust", "Hypergraph Modeling"],
+    "active_projects": [
+      {
+        "project_name": "Project Aether",
+        "role": "Lead System Architect",
+        "milestone": "Phase 2 Core Deployment"
+      },
+      {
+        "project_name": "Titan Database",
+        "role": "Consulting Engineer",
+        "milestone": "Performance Benchmarking"
+      }
+    ]
+  },
+  {
+    "employee_id": "EMP-002",
+    "full_name": "Marcus Vance",
+    "job_title": "Senior AI Research Scientist",
+    "department": "Applied Machine Learning",
+    "office_location": "Montreal",
+    "status": "Active",
+    "hire_year": 2022,
+    "clearance_level": "Tier-2",
+    "biography": "Dr. Marcus Vance leads research on retrieval-augmented generation and adaptive reasoning algorithms. He published 4 papers on neuro-symbolic hypergraph reasoning and co-developed the Project Aether semantic search index.",
+    "contact": {
+      "corporate_email": "marcus.vance@novatech-systems.internal",
+      "desk_extension": "8823"
+    },
+    "skills": ["Hyper-RAG", "Vector Search", "PyTorch", "Graph Neural Networks"],
+    "active_projects": [
+      {
+        "project_name": "Project Aether",
+        "role": "AI Retrieval Lead",
+        "milestone": "Phase 2 Core Deployment"
+      },
+      {
+        "project_name": "Cognitive Nexus",
+        "role": "Principal Investigator",
+        "milestone": "Literature Review"
+      }
+    ]
+  },
+  {
+    "employee_id": "EMP-003",
+    "full_name": "Sophia Chen",
+    "job_title": "Lead Security Compliance Officer",
+    "department": "Cybersecurity & Governance",
+    "office_location": "Singapore",
+    "status": "Active",
+    "hire_year": 2019,
+    "clearance_level": "Tier-1",
+    "biography": "Sophia Chen manages international compliance audits (SOC2 Type II, ISO 27001) and security architectures. She implemented zero-trust access controls for all European and Asian operations.",
+    "contact": {
+      "corporate_email": "sophia.chen@novatech-systems.internal",
+      "desk_extension": "2209"
+    },
+    "skills": ["Zero Trust Architecture", "SOC2 Compliance", "Threat Modeling", "Audit Automation"],
+    "active_projects": [
+      {
+        "project_name": "Project Aegis",
+        "role": "Security Lead",
+        "milestone": "Annual Audit Certification"
+      }
+    ]
+  }
+]

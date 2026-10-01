@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -23,7 +23,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional, Dict, Any, Union
 from io import StringIO
 
 # Add HyperRAG related imports
@@ -42,6 +42,19 @@ try:
 except ImportError as e:
     print(f"HyperRAG not available: {e}")
     HYPERRAG_AVAILABLE = False
+
+try:
+    from hyperrag.ingestion import (
+        GenericIngestionPipeline,
+        IngestionConfig,
+        DatasetInspectionReport,
+        sanitize_database_name,
+        SUPPORTED_EXTENSIONS,
+    )
+    GENERIC_INGESTION_AVAILABLE = True
+except ImportError as e:
+    print(f"Generic Ingestion not available: {e}")
+    GENERIC_INGESTION_AVAILABLE = False
 
 
 # Set file paths
@@ -1011,16 +1024,25 @@ async def embed_files(request: FileEmbedRequest):
                 # Use database name corresponding to file
                 database_name = file_info["database_name"]
                 print(f"[INFO] Target database: {database_name}")
-                rag = get_or_create_hyperrag(database_name)
                 
-                # Read file content
-                print("[INFO] Reading file content...")
-                content = await file_manager.read_file_content(file_info["file_path"])
-                print(f"[OK] Content length: {len(content)} characters")
+                if GENERIC_INGESTION_AVAILABLE:
+                    pipeline = GenericIngestionPipeline(
+                        IngestionConfig(
+                            max_records=50,
+                            chunk_token_size=request.chunk_size,
+                            chunk_overlap_token_size=request.chunk_overlap,
+                        )
+                    )
+                    await pipeline.ingest_file(
+                        file_info["file_path"],
+                        target_database_name=database_name,
+                        original_filename=file_info["filename"],
+                    )
+                else:
+                    rag = get_or_create_hyperrag(database_name)
+                    content = await file_manager.read_file_content(file_info["file_path"])
+                    await rag.ainsert(content)
                 
-                # Insert into HyperRAG
-                print("[INFO] Starting document embedding...")
-                await rag.ainsert(content)
                 print("[OK] Document embedding complete")
                 
                 # Update file status to embedded
@@ -1367,52 +1389,38 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
                 
                 main_logger.info(f"Processing file: {file_info['filename']} ({file_info['file_size']} bytes), database: {database_name}")
                 
-                # Initialize HyperRAG instance for each file
-                print("[INFO] Initializing HyperRAG instance...")
-                main_logger.info(f"Initializing HyperRAG instance, database: {database_name}")
-                rag = get_or_create_hyperrag(database_name)
-                print("[OK] HyperRAG instance initialized successfully")
-                main_logger.info(f"HyperRAG instance initialized successfully, using database: {database_name}")
-                
-                # Send detailed progress info
-                await manager.send_progress_update({
-                    "type": "file_processing",
-                    "file_id": file_id,
-                    "filename": file_info["filename"],
-                    "database_name": database_name,
-                    "stage": "reading",
-                    "message": f"Reading file: {file_info['filename']} (database: {database_name})"
-                })
-                
-                # Read file content
-                print("[INFO] Reading file content...")
-                main_logger.info(f"Reading file content: {file_info['filename']}")
-                content = await file_manager.read_file_content(file_info["file_path"])
-                print(f"[OK] File read complete, content length: {len(content)} characters")
-                main_logger.info(f"File read complete, content length: {len(content)} characters")
-                
-                # Show content preview
-                preview = content[:200] + "..." if len(content) > 200 else content
-                print(f"[INFO] Content preview: {preview}")
-                
-                # Send embedding phase progress
-                await manager.send_progress_update({
-                    "type": "file_processing",
-                    "file_id": file_id,
-                    "filename": file_info["filename"],
-                    "database_name": database_name,
-                    "stage": "embedding",
-                    "message": f"Embedding document: {file_info['filename']} (database: {database_name})"
-                })
-                
-                # Insert into HyperRAG
-                print("[INFO] Starting document embedding process...")
-                print("[INFO] This process may take some time, please wait...")
-                main_logger.info(f"Starting document embedding: {file_info['filename']}, database: {database_name}")
-                main_logger.info("Chunking document...")
-                
-                # Triggers HyperRAG detailed processing
-                await rag.ainsert(content)
+                if GENERIC_INGESTION_AVAILABLE:
+                    async def progress_cb(stage: str, details: dict):
+                        await manager.send_progress_update({
+                            "type": "file_processing",
+                            "file_id": file_id,
+                            "filename": file_info["filename"],
+                            "database_name": database_name,
+                            "stage": stage,
+                            "message": details.get("message", f"Stage: {stage}")
+                        })
+
+                    pipeline = GenericIngestionPipeline(
+                        IngestionConfig(
+                            max_records=50,
+                            chunk_token_size=request.chunk_size,
+                            chunk_overlap_token_size=request.chunk_overlap,
+                        )
+                    )
+                    await pipeline.ingest_file(
+                        file_info["file_path"],
+                        target_database_name=database_name,
+                        original_filename=file_info["filename"],
+                        progress_callback=progress_cb
+                    )
+                else:
+                    print("[INFO] Initializing HyperRAG instance...")
+                    main_logger.info(f"Initializing HyperRAG instance, database: {database_name}")
+                    rag = get_or_create_hyperrag(database_name)
+                    print("[OK] HyperRAG instance initialized successfully")
+                    
+                    content = await file_manager.read_file_content(file_info["file_path"])
+                    await rag.ainsert(content)
                 
                 print("[OK] Document embedding complete!")
                 main_logger.info(f"Document embedding complete: {file_info['filename']}, database: {database_name}")
@@ -1479,9 +1487,127 @@ async def process_files_with_progress(request: FileEmbedRequest, total_files: in
             "error": error_msg
         })
 
+@app.post("/ingestion/preflight")
+async def ingestion_preflight(
+    file: Optional[UploadFile] = File(None),
+    file_id: Optional[str] = Form(None)
+):
+    """
+    Preflight inspection of an uploaded file or existing file_id.
+    Zero external API calls.
+    """
+    if not GENERIC_INGESTION_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Generic Ingestion pipeline not available")
+    try:
+        pipeline = GenericIngestionPipeline()
+        if file is not None:
+            content = await file.read()
+            temp_dir = Path("scratch") / "preflight"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_path = temp_dir / file.filename
+            with open(temp_path, "wb") as f:
+                f.write(content)
+            report = pipeline.preflight_inspect(temp_path, original_filename=file.filename)
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+            return {"success": True, "report": report.to_dict()}
+        elif file_id is not None:
+            file_info = file_manager.get_file_by_id(file_id)
+            if not file_info:
+                raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+            report = pipeline.preflight_inspect(file_info["file_path"], original_filename=file_info["filename"])
+            return {"success": True, "report": report.to_dict()}
+        else:
+            raise HTTPException(status_code=400, detail="Either file or file_id must be provided")
+    except Exception as e:
+        main_logger.error(f"Preflight inspection failed: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.post("/ingestion/upload-and-process")
+async def upload_and_process(
+    file: UploadFile = File(...),
+    database_name: Optional[str] = Form(None),
+    max_records: int = Form(50)
+):
+    """
+    Generic one-click upload & ingestion pipeline endpoint.
+    Uploads raw file, inspects, normalizes, synthesizes contexts,
+    and indexes into an isolated Hyper-RAG knowledge base.
+    """
+    if not GENERIC_INGESTION_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Generic Ingestion pipeline not available")
+    try:
+        content = await file.read()
+        file_info = await file_manager.save_uploaded_file(content, file.filename)
+        file_id = file_info["file_id"]
+
+        target_db = database_name or file_info["database_name"]
+        target_db = sanitize_database_name(target_db)
+
+        # Broadcast start event
+        await manager.broadcast(json.dumps({
+            "type": "file_processing",
+            "file_id": file_id,
+            "filename": file.filename,
+            "database_name": target_db,
+            "stage": "inspecting",
+            "message": f"Starting ingestion for {file.filename}"
+        }))
+
+        async def ws_cb(stage: str, details: dict):
+            await manager.broadcast(json.dumps({
+                "type": "file_processing",
+                "file_id": file_id,
+                "filename": file.filename,
+                "database_name": target_db,
+                "stage": stage,
+                "message": details.get("message", f"Stage: {stage}")
+            }))
+
+        pipeline = GenericIngestionPipeline(IngestionConfig(max_records=max_records))
+        file_manager.update_file_status(file_id, "processing")
+
+        result = await pipeline.ingest_file(
+            file_info["file_path"],
+            target_database_name=target_db,
+            original_filename=file.filename,
+            progress_callback=ws_cb
+        )
+
+        file_manager.update_file_status(file_id, "embedded")
+
+        await manager.broadcast(json.dumps({
+            "type": "file_completed",
+            "file_id": file_id,
+            "filename": file.filename,
+            "database_name": target_db,
+            "status": "completed",
+            "message": f"Knowledge base '{target_db}' is ready!"
+        }))
+
+        return {
+            "success": True,
+            "file_id": file_id,
+            "filename": file.filename,
+            "database_name": target_db,
+            "records_indexed": result.get("records_indexed", 0),
+            "contexts_indexed": result.get("contexts_indexed", 0),
+            "status": "ready"
+        }
+    except Exception as e:
+        main_logger.error(f"Upload and process failed: {e}", exc_info=True)
+        if 'file_id' in locals():
+            file_manager.update_file_status(file_id, "error", str(e))
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 @app.get("/{full_path:path}")
 async def serve_spa_fallback(full_path: str):
-    if full_path.startswith(("db", "hyperrag", "files", "settings", "databases", "docs", "openapi.json", "ws", "test-api")):
+    if full_path.startswith(("db", "hyperrag", "files", "settings", "databases", "docs", "openapi.json", "ws", "test-api", "ingestion")):
         raise HTTPException(status_code=404, detail="Not Found")
     index_file = os.path.join(frontend_dist_dir, "index.html")
     if os.path.exists(index_file):

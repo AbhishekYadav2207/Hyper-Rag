@@ -143,7 +143,7 @@
     "upload_document": "Upload Document",
     "drag_drop_files": "Click or drag files here",
     "release_files": "Release files to upload",
-    "supported_formats": "Supports TXT, PDF, DOCX, MD and other formats",
+    "supported_formats": "Supports JSON, JSONL, CSV, TXT, PDF, DOCX, MD (automatic schema discovery & indexing)",
     "uploading": "Uploading...",
     "document_list": "Document List",
     "select_all": "Select All",

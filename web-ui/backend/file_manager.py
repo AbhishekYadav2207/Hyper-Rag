@@ -26,11 +26,12 @@ class FileManager:
         self.metadata_lock = asyncio.Lock()
         
         # Supported file types
-        self.supported_extensions = {'.txt', '.pdf', '.docx', '.md', '.doc'}
+        self.supported_extensions = {'.txt', '.pdf', '.docx', '.md', '.doc', '.json', '.jsonl', '.csv'}
         self.supported_mime_types = {
             'text/plain', 'application/pdf', 
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/msword', 'text/markdown'
+            'application/msword', 'text/markdown',
+            'application/json', 'application/x-jsonlines', 'text/csv'
         }
         
         # Initialize metadata file
@@ -46,7 +47,12 @@ class FileManager:
         """Load metadata dictionary."""
         try:
             with open(self.metadata_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                elif isinstance(data, list):
+                    return {item.get("file_id", str(i)): item for i, item in enumerate(data) if isinstance(item, dict)}
+                return {}
         except (FileNotFoundError, json.JSONDecodeError):
             return {}
     
@@ -90,7 +96,10 @@ class FileManager:
                 '.pdf': 'application/pdf',
                 '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 '.doc': 'application/msword',
-                '.md': 'text/markdown'
+                '.md': 'text/markdown',
+                '.json': 'application/json',
+                '.jsonl': 'application/x-jsonlines',
+                '.csv': 'text/csv'
             }
             mime_type = mime_type_map.get(ext, 'application/octet-stream')
             
@@ -233,8 +242,8 @@ class FileManager:
             return self._read_pdf(file_path)
         elif file_path.suffix.lower() in ['.docx']:
             return self._read_docx(file_path)
-        elif file_path.suffix.lower() in ['.txt', '.md']:
-            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+        elif file_path.suffix.lower() in ['.txt', '.md', '.json', '.jsonl', '.csv']:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                 return await f.read()
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")
