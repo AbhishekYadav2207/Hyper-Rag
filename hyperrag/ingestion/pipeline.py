@@ -315,15 +315,19 @@ class GenericIngestionPipeline:
         if target_link.exists():
             return
         try:
-            # On Windows try directory junction
-            cmd = f'cmd /c mklink /J "{target_link}" "{source_dir}"'
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            if res.returncode == 0:
-                logger.info(f"Created directory junction from {target_link} to {source_dir}")
+            target_link.parent.mkdir(parents=True, exist_ok=True)
+            if os.name == "nt":
+                cmd = f'cmd /c mklink /J "{target_link}" "{source_dir}"'
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                if res.returncode == 0:
+                    logger.info(f"Created directory junction from {target_link} to {source_dir}")
+                    return
             else:
-                # If junction fails, create directory directly
-                target_link.mkdir(parents=True, exist_ok=True)
-                logger.warning(f"Junction fallback: created directory {target_link}")
+                os.symlink(str(source_dir), str(target_link), target_is_directory=True)
+                logger.info(f"Created symlink from {target_link} to {source_dir}")
+                return
         except Exception as e:
-            logger.warning(f"Failed to create junction from {target_link} to {source_dir}: {e}")
-            target_link.mkdir(parents=True, exist_ok=True)
+            logger.warning(f"Failed to create link from {target_link} to {source_dir}: {e}")
+
+        target_link.mkdir(parents=True, exist_ok=True)
+        logger.warning(f"Link fallback: created directory {target_link}")

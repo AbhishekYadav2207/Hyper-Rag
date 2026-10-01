@@ -89,7 +89,7 @@ This troubleshooting handbook provides symptoms, root causes, confirmation steps
 - **How to Confirm**: Run `GET http://127.0.0.1:8000/databases`. If your dataset is not in the array, the directory is absent from `hyperrag_cache/`.
 - **Fix**: Create a directory junction in `hyperrag_cache/`:
   ```powershell
-  cmd /c mklink /J "D:\Rag\Hyper-RAG\hyperrag_cache\my_dataset_test" "D:\Rag\Hyper-RAG\caches\my_dataset_test"
+  cmd /c mklink /J ".\hyperrag_cache\my_dataset_test" ".\caches\my_dataset_test"
   ```
 - **Verification**: Refresh browser; database appears immediately in dropdown.
 

@@ -7,7 +7,7 @@ This document provides complete reference documentation for both the **Python SD
 ## 1. Python Public API
 
 ### 1.1 `HyperRAG` Class
-Defined in [`hyperrag/hyperrag.py`](file:///d:/Rag/Hyper-RAG/hyperrag/hyperrag.py#L32).
+Defined in [`hyperrag/hyperrag.py`](../hyperrag/hyperrag.py#L32).
 
 #### Constructor
 ```python
@@ -65,7 +65,7 @@ Synchronous convenience wrapper around `ainsert`.
 ---
 
 ### 1.2 `QueryParam` Dataclass
-Defined in [`hyperrag/base.py`](file:///d:/Rag/Hyper-RAG/hyperrag/base.py#L15).
+Defined in [`hyperrag/base.py`](../hyperrag/base.py#L15).
 
 ```python
 from hyperrag import QueryParam
@@ -91,7 +91,7 @@ param = QueryParam(
 ---
 
 ### 1.3 `AdaptiveDecision` Schema
-Defined in [`hyperrag/adaptive_router.py`](file:///d:/Rag/Hyper-RAG/hyperrag/adaptive_router.py#L37).
+Defined in [`hyperrag/adaptive_router.py`](../hyperrag/adaptive_router.py#L37).
 
 ```python
 @dataclass
@@ -115,7 +115,7 @@ class AdaptiveDecision:
 ---
 
 ### 1.4 `AdaptiveRouter` Class
-Defined in [`hyperrag/adaptive_router.py`](file:///d:/Rag/Hyper-RAG/hyperrag/adaptive_router.py#L248).
+Defined in [`hyperrag/adaptive_router.py`](../hyperrag/adaptive_router.py#L248).
 
 ```python
 from hyperrag import AdaptiveRouter, ComplexityWeights
@@ -133,7 +133,7 @@ print(decision.mode)  # "core"
 ---
 
 ### 1.5 `ValidationResult` Schema
-Defined in [`hyperrag/response_validator.py`](file:///d:/Rag/Hyper-RAG/hyperrag/response_validator.py).
+Defined in [`hyperrag/response_validator.py`](../hyperrag/response_validator.py).
 
 ```python
 @dataclass
@@ -164,7 +164,7 @@ Health check and deployment status.
   "status": "ok",
   "data_name": "pathology",
   "mode": "hyper",
-  "working_dir": "d:\\Rag\\Hyper-RAG\\caches\\pathology",
+  "working_dir": "./caches/pathology",
   "api_key_required": false
 }
 ```

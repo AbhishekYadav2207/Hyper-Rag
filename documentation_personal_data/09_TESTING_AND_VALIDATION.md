@@ -27,7 +27,7 @@ This document outlines the multi-tier testing framework required to validate cus
 
 ## 2. Tier 1: Local Unit Tests (Offline, Zero API Calls)
 
-Implemented in [tests/test_tsbc_maritime.py](file:///d:/Rag/Hyper-RAG/tests/test_tsbc_maritime.py), this test suite runs entirely offline without credentials:
+Implemented in [tests/test_tsbc_maritime.py](../tests/test_tsbc_maritime.py), this test suite runs entirely offline without credentials:
 
 ### A. Data Schema & Edge Case Tests
 - **Empty Arrays**: Verify that records with empty child arrays (`vessels: []` or `lsa_equipment: []`) do not throw `IndexError`.
@@ -111,7 +111,7 @@ Execute three distinct classes of query against your new database:
 
 ## 5. Tier 4: Automated Browser & WebUI Testing
 
-Run [scratch/verify_tsbc_browser.py](file:///d:/Rag/Hyper-RAG/scratch/verify_tsbc_browser.py) to validate the complete frontend user experience:
+Run [scratch/verify_tsbc_browser.py](../scratch/verify_tsbc_browser.py) to validate the complete frontend user experience:
 
 1. **Database Selection**: Verifies that the header dropdown successfully selects the target database (`tsbc_maritime_test`).
 2. **Thinking State Transition**:

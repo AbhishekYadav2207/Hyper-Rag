@@ -5,15 +5,13 @@ class GlobalUser {
   userInfo: Partial<User.UserEntity> = {}
   selectedDatabase: string = ''
   availableDatabases: Array<{ name: string; description: string }> = []
+  databasesLoading: boolean = false
 
   constructor() {
     makeAutoObservable(this)
   }
 
   async getUserDetail() {
-    // const res = await getCurrentUserInfo()
-    // this.userInfo = res?.data
-    // new WebSee(res?.data?.username)
     this.userInfo = {
       roles: [
         {
@@ -25,7 +23,7 @@ class GlobalUser {
           sort: 5
         }
       ],
-      icon: 'http://jinpika-1308276765.cos.ap-shanghai.myqcloud.com/bootdemo-file/20221220/src=http___desk-fd.zol-img.com.cn_t_s960x600c5_g2_M00_00_0B_ChMlWl6yKqyILFoCACn-5rom2uIAAO4DgEODxAAKf7-298.jpg&refer=http___desk-fd.zol-img.com.png',
+      icon: '/logo.png',
       username: 'admin'
     }
   }
@@ -79,6 +77,7 @@ class GlobalUser {
 
   // Fetch databases list
   async loadDatabases() {
+    this.databasesLoading = true
     try {
       const response = await fetch(`${SERVER_URL}/databases`)
       if (response.ok) {
@@ -88,6 +87,8 @@ class GlobalUser {
       }
     } catch (error) {
       console.error('Failed to load database list:', error)
+    } finally {
+      this.databasesLoading = false
     }
     return []
   }

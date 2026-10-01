@@ -1045,8 +1045,8 @@ No. Phase 3 validation is 100% deterministic and runs in-process in Python. It a
 Use the Web UI: click **Settings** $\rightarrow$ **Reset Knowledge Base**, or delete the cache folder (`rm -rf caches/default`).
 
 ### Q6: Where can I find more in-depth technical details?
-- System Architecture: [`docs/ARCHITECTURE.md`](file:///d:/Rag/Hyper-RAG/docs/ARCHITECTURE.md)
-- Adaptive RAG Specification: [`docs/ADAPTIVE_HYPERRAG.md`](file:///d:/Rag/Hyper-RAG/docs/ADAPTIVE_HYPERRAG.md)
-- Configuration Reference: [`docs/CONFIGURATION.md`](file:///d:/Rag/Hyper-RAG/docs/CONFIGURATION.md)
-- API Reference: [`docs/API_REFERENCE.md`](file:///d:/Rag/Hyper-RAG/docs/API_REFERENCE.md)
-- Verification Baseline: [`docs/VERIFICATION_AND_OUTCOMES.md`](file:///d:/Rag/Hyper-RAG/docs/VERIFICATION_AND_OUTCOMES.md)
+- System Architecture: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+- Adaptive RAG Specification: [`docs/ADAPTIVE_HYPERRAG.md`](ADAPTIVE_HYPERRAG.md)
+- Configuration Reference: [`docs/CONFIGURATION.md`](CONFIGURATION.md)
+- API Reference: [`docs/API_REFERENCE.md`](API_REFERENCE.md)
+- Verification Baseline: [`docs/VERIFICATION_AND_OUTCOMES.md`](VERIFICATION_AND_OUTCOMES.md)

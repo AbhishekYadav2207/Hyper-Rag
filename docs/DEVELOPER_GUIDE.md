@@ -26,7 +26,7 @@ hyperrag/
 
 ### 2.1 Extending Adaptive Query Routing (`hyperrag/adaptive_router.py`)
 To add a new linguistic feature to Phase 1:
-1. Open [`QueryFeatures`](file:///d:/Rag/Hyper-RAG/hyperrag/adaptive_router.py). Add the new boolean or integer field to the dataclass.
+1. Open [`QueryFeatures`](../hyperrag/adaptive_router.py). Add the new boolean or integer field to the dataclass.
 2. In `QueryFeatureExtractor.extract()`, add the regular expression or token pattern detecting the feature.
 3. In `ComplexityWeights`, add a corresponding weight parameter with a default point allocation.
 4. In `HeuristicComplexityScorer.score()`, add the point contribution to the score accumulation.

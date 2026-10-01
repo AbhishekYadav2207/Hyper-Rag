@@ -38,7 +38,7 @@ The WebUI does not require hardcoding database names. Instead, it discovers avai
 ### Creating the Filesystem Junction
 On Windows, create the link using `mklink /J`:
 ```powershell
-cmd /c mklink /J "D:\Rag\Hyper-RAG\hyperrag_cache\tsbc_maritime_test" "D:\Rag\Hyper-RAG\caches\tsbc_maritime_test"
+cmd /c mklink /J ".\hyperrag_cache\tsbc_maritime_test" ".\caches\tsbc_maritime_test"
 ```
 On Linux/macOS, use a symbolic link:
 ```bash
@@ -125,7 +125,7 @@ When submitting a query in the Chat view, the UI rendered a message bubble with 
 
 ## 3. Automated Browser Verification Workflow (Playwright)
 
-Never claim that WebUI integration works without automated browser validation. We developed [scratch/verify_tsbc_browser.py](file:///d:/Rag/Hyper-RAG/scratch/verify_tsbc_browser.py) to execute automated end-to-end browser tests.
+Never claim that WebUI integration works without automated browser validation. We developed [scratch/verify_tsbc_browser.py](../scratch/verify_tsbc_browser.py) to execute automated end-to-end browser tests.
 
 ```python
 # Reusable Playwright Verification Pattern

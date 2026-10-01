@@ -7,15 +7,15 @@ This document records the chronological engineering history of integrating the *
 ## Citations & Verification Baseline
 
 The facts, metrics, schemas, and debugging logs documented below are drawn directly from the following project artifacts:
-- Source Corpus: `D:\CAIR\TSBC-MaritimePipeline\outputs\maritime_corpus.jsonl`
-- Pipeline Implementation: [datasets/tsbc_maritime/pipeline.py](file:///d:/Rag/Hyper-RAG/datasets/tsbc_maritime/pipeline.py)
+- Source Corpus: `external_data/maritime_corpus.jsonl`
+- Pipeline Implementation: [datasets/tsbc_maritime/pipeline.py](../datasets/tsbc_maritime/pipeline.py)
 - Source Audit Script: `scratch/audit_tsbc_corpus.py` and output `scratch/audit_results.json`
 - Candidate Scoring Script: `scratch/find_deterministic_candidates.py` and output `scratch/scored_candidates.json`
-- Unit Test Suite: [tests/test_tsbc_maritime.py](file:///d:/Rag/Hyper-RAG/tests/test_tsbc_maritime.py)
-- Browser Verification Script: [scratch/verify_tsbc_browser.py](file:///d:/Rag/Hyper-RAG/scratch/verify_tsbc_browser.py)
-- WebUI Backend: [web-ui/backend/main.py](file:///d:/Rag/Hyper-RAG/web-ui/backend/main.py) and [web-ui/backend/db.py](file:///d:/Rag/Hyper-RAG/web-ui/backend/db.py)
-- WebUI Frontend: [web-ui/frontend/src/pages/Home/index.tsx](file:///d:/Rag/Hyper-RAG/web-ui/frontend/src/pages/Home/index.tsx)
-- Historical Guide: [docs/TSBC_MARITIME_HYPERRAG_GUIDE.md](file:///d:/Rag/Hyper-RAG/docs/TSBC_MARITIME_HYPERRAG_GUIDE.md)
+- Unit Test Suite: [tests/test_tsbc_maritime.py](../tests/test_tsbc_maritime.py)
+- Browser Verification Script: [scratch/verify_tsbc_browser.py](../scratch/verify_tsbc_browser.py)
+- WebUI Backend: [web-ui/backend/main.py](../web-ui/backend/main.py) and [web-ui/backend/db.py](../web-ui/backend/db.py)
+- WebUI Frontend: [web-ui/frontend/src/pages/Home/index.tsx](../web-ui/frontend/src/pages/Home/index.tsx)
+- Historical Guide: [docs/TSBC_MARITIME_HYPERRAG_GUIDE.md](../docs/TSBC_MARITIME_HYPERRAG_GUIDE.md)
 
 ---
 
@@ -39,7 +39,7 @@ Prior to the maritime integration, Hyper-RAG operated with the following baselin
 ## Phase 1 — Source Corpus Audit
 
 ### Location & Immutability
-- **Corpus File**: `D:\CAIR\TSBC-MaritimePipeline\outputs\maritime_corpus.jsonl`
+- **Corpus File**: `external_data/maritime_corpus.jsonl`
 - **Integrity Rule**: The source corpus was strictly treated as read-only. No script was permitted to write, format, or truncate this file.
 
 ### Local Audit Execution
@@ -135,7 +135,7 @@ The audit exposed the deep nested structure of each JSON line:
 
 ## Phase 3 — Normalization & Deduplication
 
-We created `TSBCRecordNormalizer` in [datasets/tsbc_maritime/pipeline.py](file:///d:/Rag/Hyper-RAG/datasets/tsbc_maritime/pipeline.py) to execute purely local normalization:
+We created `TSBCRecordNormalizer` in [datasets/tsbc_maritime/pipeline.py](../datasets/tsbc_maritime/pipeline.py) to execute purely local normalization:
 1. **Multi-Perspective Merging**: All raw lines sharing an `occurrence_id` were aggregated. Narratives from `occurrence_summary` and `vessel_consolidated_narrative` were merged into a unified narrative catalog.
 2. **Composite Tuple Deduplication**:
    - Life-saving appliances were deduplicated by `(LsApplianceDisplayEng, UsedEnumDisplayEng, ApprovedEnumDisplayEng)`.
@@ -264,7 +264,7 @@ During the integration, three critical defects were uncovered and resolved.
      return {"success": True, "response": resp, "answer": resp, ...}
      ```
   5. Rebuilt static assets (`npm run build`).
-- **Verification**: Verified via Playwright in [scratch/verify_tsbc_browser.py](file:///d:/Rag/Hyper-RAG/scratch/verify_tsbc_browser.py). The "Thinking..." indicator vanished within ~5-10 seconds and rendered full prose.
+- **Verification**: Verified via Playwright in [scratch/verify_tsbc_browser.py](../scratch/verify_tsbc_browser.py). The "Thinking..." indicator vanished within ~5-10 seconds and rendered full prose.
 
 ---
 

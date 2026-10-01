@@ -72,7 +72,7 @@ $$\text{Estimated Token Volume} \approx \text{Estimated Chunks} \times 2,500 \te
 
 ## 4. Hardcoded Pipeline Safety Guards
 
-In [datasets/tsbc_maritime/pipeline.py](file:///d:/Rag/Hyper-RAG/datasets/tsbc_maritime/pipeline.py), we implemented programmatic guardrails that abort execution if limits are breached:
+In [datasets/tsbc_maritime/pipeline.py](../datasets/tsbc_maritime/pipeline.py), we implemented programmatic guardrails that abort execution if limits are breached:
 
 ```python
 # Programmatic guardrail in pipeline.py

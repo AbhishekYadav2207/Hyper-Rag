@@ -7,7 +7,7 @@ Use this template to record the initial offline profiling results for any new da
 ## 1. Dataset Overview
 
 - **Dataset Identifier**: `[e.g. tsbc_maritime, financial_sec_filings, clinical_trials]`
-- **Source File Path**: `[Absolute path to raw file, e.g. D:\Datasets\my_data.jsonl]`
+- **Source File Path**: `[Path to raw file, e.g. datasets/my_data.jsonl]`
 - **Storage Format**: `[JSONL / Monolithic JSON / CSV / Parquet / SQLite / Excel]`
 - **Total File Size**: `[e.g. 142.5 MB]`
 - **Total Record Count**: `[e.g. 68,355 lines / 12,400 rows]`

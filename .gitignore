@@ -1,6 +1,6 @@
-/my_config.py
 .DS_Store
 caches/
+hyperrag_cache/
 .vscode/
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -16,7 +16,11 @@ build/
 develop-eggs/
 /datasets/*
 !datasets/__init__.py
+!datasets/demo/
 !datasets/tsbc_maritime/
+datasets/tsbc_maritime/contexts/
+datasets/tsbc_maritime/normalized/
+datasets/tsbc_maritime/reports/
 dist/
 downloads/
 eggs/
@@ -182,21 +186,31 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# web-ui
+# web-ui runtime & state
 settings.json
 !settings.example.json
-web-ui/backend/settings.json    
+web-ui/backend/settings.json
 hyperrag_cache/
 web-ui/backend/hyperrag_cache/
-web-ui/backend/uploads/
+uploads/*
+!uploads/.gitkeep
+web-ui/backend/uploads/*
+!web-ui/backend/uploads/.gitkeep
 web-ui/backend/files.db
 file_metadata.json
+web-ui/backend/file_metadata.json
 *.hgdb
+vdb_*.json
+kv_store_*.json
 
-# Local test caches & scratch
+# Frontend build & dependencies
+web-ui/frontend/node_modules/
+web-ui/frontend/dist/
+
+# Local test caches, logs & scratch
 test_cache/
 /scratch/
 /logs/
+*.log
 *validation*.log
 *validation_benchmark*.json
-/datasets/*

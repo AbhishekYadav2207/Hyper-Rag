@@ -6,17 +6,29 @@ class DatabaseManager:
     def __init__(self):
         self.databases = {}
         repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        root_cache = os.path.join(repo_root, "hyperrag_cache")
-        self.cache_dir = root_cache if os.path.exists(root_cache) else "hyperrag_cache"
-        self.default_database = "mock" if os.path.exists(os.path.join(self.cache_dir, "mock")) else "default"
+        self.repo_root = repo_root
+        self.hyperrag_cache_dir = os.path.join(repo_root, "hyperrag_cache")
+        self.caches_dir = os.path.join(repo_root, "caches")
+        try:
+            os.makedirs(self.hyperrag_cache_dir, exist_ok=True)
+            os.makedirs(self.caches_dir, exist_ok=True)
+        except Exception:
+            pass
+        self.cache_dir = self.hyperrag_cache_dir
+        self.default_database = "mock" if (
+            os.path.exists(os.path.join(self.hyperrag_cache_dir, "mock")) or
+            os.path.exists(os.path.join(self.caches_dir, "mock"))
+        ) else "default"
         
     def get_database(self, database_name=None):
         """Get database instance by name."""
         if database_name is None:
             return None
             
-        # Build complete database file path
-        database_path = os.path.join(self.cache_dir, database_name, "hypergraph_chunk_entity_relation.hgdb")
+        # Check both hyperrag_cache and caches directories
+        path1 = os.path.join(self.hyperrag_cache_dir, database_name, "hypergraph_chunk_entity_relation.hgdb")
+        path2 = os.path.join(self.caches_dir, database_name, "hypergraph_chunk_entity_relation.hgdb")
+        database_path = path1 if os.path.exists(path1) else path2
         
         # Check if database file exists
         if not os.path.exists(database_path):
@@ -29,25 +41,20 @@ class DatabaseManager:
         return self.databases[database_name]
     
     def list_databases(self):
-        """List all available database directories in hyperrag_cache."""
-        databases = []
-        
-        # Check if hyperrag_cache directory exists
-        if not os.path.exists(self.cache_dir):
-            return databases
-        
-        try:
-            for file in os.listdir(self.cache_dir):
-                file_path = os.path.join(self.cache_dir, file)
-               
-                if os.path.isdir(file_path):
-                    databases.append(file)
-            # Prioritize mock database if present
-            databases.sort(key=lambda x: 0 if x == "mock" else 1)
-        except OSError:
-            pass
-                
+        """List all available database directories in hyperrag_cache and caches."""
+        found = set()
+        for cdir in [self.hyperrag_cache_dir, self.caches_dir]:
+            if os.path.exists(cdir):
+                try:
+                    for item in os.listdir(cdir):
+                        p = os.path.join(cdir, item)
+                        if os.path.isdir(p) and not item.startswith((".", "_")) and item != "__pycache__":
+                            found.add(item)
+                except OSError:
+                    pass
+        databases = sorted(list(found), key=lambda x: (0 if x == "mock" else 1, x))
         return databases
+
 
 # Global database manager instance
 db_manager = DatabaseManager()

@@ -27,7 +27,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Source["Read-Only Source Corpus"]
-        S1["D:\CAIR\TSBC-MaritimePipeline\outputs\maritime_corpus.jsonl<br/>(68,355 lines | 44,329 occurrences)"]
+        S1["external_data/maritime_corpus.jsonl<br/>(68,355 lines | 44,329 occurrences)"]
     end
 
     subgraph Pipeline["datasets/tsbc_maritime/pipeline.py"]

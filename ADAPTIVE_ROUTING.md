@@ -1,7 +1,7 @@
 # Adaptive Hyper-RAG: Deterministic Query Complexity Routing & Escalation
 
 > [!NOTE]
-> This document provides the architectural theory and historical design notes for Adaptive Hyper-RAG. For the complete, beginner-friendly user manual and operational runbooks, see [**`docs/USER_MANUAL.md`**](file:///d:/Rag/Hyper-RAG/docs/USER_MANUAL.md). For the in-depth technical specification covering Phases 1, 2, 2.1, and 3, see [**`docs/ADAPTIVE_HYPERRAG.md`**](file:///d:/Rag/Hyper-RAG/docs/ADAPTIVE_HYPERRAG.md).
+> This document provides the architectural theory and historical design notes for Adaptive Hyper-RAG. For the complete, beginner-friendly user manual and operational runbooks, see [**`docs/USER_MANUAL.md`**](docs/USER_MANUAL.md). For the in-depth technical specification covering Phases 1, 2, 2.1, and 3, see [**`docs/ADAPTIVE_HYPERRAG.md`**](docs/ADAPTIVE_HYPERRAG.md).
 
 ---
 
@@ -105,6 +105,6 @@ ADAPTIVE_LOG_DECISIONS=true
 ## 4. Test Verification & Code Examples
 
 See detailed examples and test commands in:
-- [**`docs/USER_MANUAL.md`**](file:///d:/Rag/Hyper-RAG/docs/USER_MANUAL.md#11-first-query-walkthrough)
-- [**`docs/TESTING.md`**](file:///d:/Rag/Hyper-RAG/docs/TESTING.md)
-- [**`docs/ADAPTIVE_HYPERRAG.md`**](file:///d:/Rag/Hyper-RAG/docs/ADAPTIVE_HYPERRAG.md)
+- [**`docs/USER_MANUAL.md`**](docs/USER_MANUAL.md#11-first-query-walkthrough)
+- [**`docs/TESTING.md`**](docs/TESTING.md)
+- [**`docs/ADAPTIVE_HYPERRAG.md`**](docs/ADAPTIVE_HYPERRAG.md)

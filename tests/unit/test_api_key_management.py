@@ -248,3 +248,42 @@ def test_frontend_bundles_do_not_contain_secrets():
                     assert pat not in content, f"Forbidden pattern '{pat}' found in frontend bundle: {file_path.name}"
             except Exception:
                 pass
+
+
+def test_health_check_endpoint():
+    """Verify GET /health returns safe system status without secrets."""
+    from main import health_check
+    async def _run():
+        res = await health_check()
+        assert res["status"] == "healthy"
+        assert res["backend"] == "ready"
+        assert "apiKey" not in res
+        assert "embeddingApiKey" not in res
+        res_str = json.dumps(res)
+        assert "sk-" not in res_str
+    asyncio.run(_run())
+
+
+def test_env_bootstrap_when_no_saved_settings(temp_settings_file, monkeypatch):
+    """Verify that in a fresh environment without settings.json, .env keys bootstrap correctly."""
+    async def _run():
+        if temp_settings_file.exists():
+            temp_settings_file.unlink()
+
+        monkeypatch.setenv("OPENROUTER_API_KEY", "env-bootstrap-openrouter-key")
+        monkeypatch.delenv("OPENROUTER_API_KEYS", raising=False)
+        monkeypatch.setenv("EMB_API_KEY", "env-bootstrap-mistral-key")
+        monkeypatch.setenv("MISTRAL_API_KEY", "env-bootstrap-mistral-key")
+        monkeypatch.delenv("EMB_API_KEYS", raising=False)
+
+        effective = get_effective_settings()
+        assert effective["apiKey"] == "env-bootstrap-openrouter-key"
+        assert effective["embeddingApiKey"] == "env-bootstrap-mistral-key"
+
+        # Verify get_settings exposes preview without full secret
+        settings_res = await get_settings()
+        assert settings_res["apiKeyConfigured"] is True
+        assert "env-bootstrap-openrouter-key" not in json.dumps(settings_res)
+        assert settings_res["apiKeyPreview"].endswith("-key")
+    asyncio.run(_run())
+

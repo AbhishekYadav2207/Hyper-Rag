@@ -1,14 +1,14 @@
 # Request and Data Flow Reference
 
 > [!NOTE]
-> The comprehensive, updated system architecture and end-to-end Mermaid sequence diagrams are maintained in [**`docs/ARCHITECTURE.md`**](file:///d:/Rag/Hyper-RAG/docs/ARCHITECTURE.md).
+> The comprehensive, updated system architecture and end-to-end Mermaid sequence diagrams are maintained in [**`docs/ARCHITECTURE.md`**](ARCHITECTURE.md).
 
 ---
 
 ## 1. Indexing Pipeline Summary
 Raw documents are chunked into ~1200 token passages, embedded with Mistral (1024-dim), processed by the OpenRouter LLM to extract entities and multi-entity relationships, and committed into `KVStorage`, `BaseVectorStorage`, and `ChunkEntityRelationHypergraph`.
 
-For detailed architecture diagrams, see [**Ingestion Pipeline in `docs/ARCHITECTURE.md`**](file:///d:/Rag/Hyper-RAG/docs/ARCHITECTURE.md#51-ingestion--indexing-pipeline-offline).
+For detailed architecture diagrams, see [**Ingestion Pipeline in `docs/ARCHITECTURE.md`**](ARCHITECTURE.md#51-ingestion--indexing-pipeline-offline).
 
 ---
 
@@ -22,4 +22,4 @@ For detailed architecture diagrams, see [**Ingestion Pipeline in `docs/ARCHITECT
 5. **Phase 3 Response Validator** checks completeness, evidence support, and relevance.
 6. Validated answer and structured decision metadata return to client.
 
-For the complete interactive sequence diagram, see [**Query Lifecycle in `docs/ARCHITECTURE.md`**](file:///d:/Rag/Hyper-RAG/docs/ARCHITECTURE.md#52-online-query-lifecycle-adaptive-routing-with-sufficiency--escalation).
+For the complete interactive sequence diagram, see [**Query Lifecycle in `docs/ARCHITECTURE.md`**](ARCHITECTURE.md#52-online-query-lifecycle-adaptive-routing-with-sufficiency--escalation).

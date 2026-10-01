@@ -150,9 +150,9 @@ User Question
 
 ## 7. Next Steps
 
-- **Read the Complete Beginner Manual**: [`docs/USER_MANUAL.md`](file:///d:/Rag/Hyper-RAG/docs/USER_MANUAL.md)
-- **Explore Web Console Views**: [`docs/WEB_UI_GUIDE.md`](file:///d:/Rag/Hyper-RAG/docs/WEB_UI_GUIDE.md)
-- **Deep-Dive into System Architecture**: [`docs/ARCHITECTURE.md`](file:///d:/Rag/Hyper-RAG/docs/ARCHITECTURE.md)
-- **Understand Adaptive Hyper-RAG**: [`docs/ADAPTIVE_HYPERRAG.md`](file:///d:/Rag/Hyper-RAG/docs/ADAPTIVE_HYPERRAG.md)
-- **Troubleshoot Common Issues**: [`docs/TROUBLESHOOTING.md`](file:///d:/Rag/Hyper-RAG/docs/TROUBLESHOOTING.md)
-- **Interactive REST API Reference**: [`docs/API_REFERENCE.md`](file:///d:/Rag/Hyper-RAG/docs/API_REFERENCE.md)
+- **Read the Complete Beginner Manual**: [`docs/USER_MANUAL.md`](USER_MANUAL.md)
+- **Explore Web Console Views**: [`docs/WEB_UI_GUIDE.md`](WEB_UI_GUIDE.md)
+- **Deep-Dive into System Architecture**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+- **Understand Adaptive Hyper-RAG**: [`docs/ADAPTIVE_HYPERRAG.md`](ADAPTIVE_HYPERRAG.md)
+- **Troubleshoot Common Issues**: [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
+- **Interactive REST API Reference**: [`docs/API_REFERENCE.md`](API_REFERENCE.md)

@@ -73,6 +73,23 @@ if not os.path.exists(SETTINGS_FILE) and os.path.exists(_legacy_settings):
     except Exception:
         pass
 
+def init_runtime_environment():
+    """Ensure essential runtime storage directories exist."""
+    dirs_to_init = [
+        os.path.join(_repo_root, "caches"),
+        os.path.join(_repo_root, "hyperrag_cache"),
+        os.path.join(_repo_root, "uploads"),
+        os.path.join(_repo_root, "scratch"),
+        os.path.join(_backend_dir, "uploads"),
+    ]
+    for d in dirs_to_init:
+        try:
+            os.makedirs(d, exist_ok=True)
+        except Exception:
+            pass
+
+init_runtime_environment()
+
 import re
 
 def sanitize_error_message(msg: str) -> str:
@@ -138,7 +155,29 @@ async def root():
     index_file = os.path.join(frontend_dist_dir, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {"message": "Hyper-RAG"}
+    return {"message": "Hyper-RAG", "status": "Frontend not built. Please run 'npm run build' inside web-ui/frontend or use start script."}
+
+@app.get("/health")
+async def health_check():
+    """
+    Application health and readiness check endpoint.
+    Exposes non-sensitive status without revealing credentials or internal secrets.
+    """
+    settings = get_effective_settings()
+    llm_configured = bool(settings.get("apiKey") or os.getenv("OPENROUTER_API_KEYS") or os.getenv("OPENROUTER_API_KEY"))
+    emb_configured = bool(settings.get("embeddingApiKey") or os.getenv("EMB_API_KEYS") or os.getenv("EMB_API_KEY") or os.getenv("MISTRAL_API_KEY"))
+    
+    return {
+        "status": "healthy",
+        "backend": "ready",
+        "hyperrag_available": HYPERRAG_AVAILABLE,
+        "generic_ingestion_available": GENERIC_INGESTION_AVAILABLE,
+        "llm_provider_configured": llm_configured,
+        "embedding_provider_configured": emb_configured,
+        "llm_model": settings.get("modelName", "unknown"),
+        "embedding_model": settings.get("embeddingModel", "unknown"),
+        "version": "1.0.0"
+    }
 
 
 @app.get("/db")
@@ -624,22 +663,34 @@ hyperrag_working_dir = _root_cache if os.path.exists(_root_cache) else "hyperrag
 def get_effective_settings() -> dict:
     """
     Runtime source of truth for WebUI settings.
-    Precedence: WebUI Settings (settings.json) > Defaults.
-    Credentials MUST come from WebUI settings. .env is NOT the runtime credential source.
+    Precedence: WebUI Settings (settings.json) > .env bootstrap > defaults.
+    Credentials can be bootstrapped from .env and overridden via WebUI Settings.
     """
+    env_openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+    if not env_openrouter_key and os.getenv("OPENROUTER_API_KEYS"):
+        keys = [k.strip() for k in os.getenv("OPENROUTER_API_KEYS", "").split(",") if k.strip()]
+        if keys:
+            env_openrouter_key = keys[0]
+
+    env_emb_key = os.getenv("EMB_API_KEY", "") or os.getenv("MISTRAL_API_KEY", "")
+    if not env_emb_key and os.getenv("EMB_API_KEYS"):
+        keys = [k.strip() for k in os.getenv("EMB_API_KEYS", "").split(",") if k.strip()]
+        if keys:
+            env_emb_key = keys[0]
+
     base_settings = {
-        "modelProvider": "openrouter",
-        "modelName": "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "baseUrl": "https://openrouter.ai/api/v1",
-        "apiKey": "",
+        "modelProvider": os.getenv("OPENROUTER_PROVIDER", "openrouter"),
+        "modelName": os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+        "baseUrl": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        "apiKey": env_openrouter_key,
         "embeddingProvider": "mistral",
-        "embeddingModel": "mistral-embed",
-        "embeddingBaseUrl": "https://api.mistral.ai/v1",
-        "embeddingApiKey": "",
-        "embeddingDim": 1024,
-        "selectedDatabase": "mock",
-        "maxTokens": 2000,
-        "temperature": 0.7,
+        "embeddingModel": os.getenv("EMB_MODEL", "mistral-embed"),
+        "embeddingBaseUrl": os.getenv("EMB_BASE_URL", "https://api.mistral.ai/v1"),
+        "embeddingApiKey": env_emb_key,
+        "embeddingDim": int(os.getenv("EMB_DIM", "1024")),
+        "selectedDatabase": os.getenv("DEFAULT_DATABASE", "mock"),
+        "maxTokens": int(os.getenv("MAX_TOKENS", "2000")),
+        "temperature": float(os.getenv("TEMPERATURE", "0.7")),
     }
 
     saved = load_raw_settings()
@@ -1641,7 +1692,8 @@ async def ingestion_preflight(
             content = await file.read()
             temp_dir = Path("scratch") / "preflight"
             temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_path = temp_dir / file.filename
+            safe_name = Path(file.filename).name
+            temp_path = temp_dir / safe_name
             with open(temp_path, "wb") as f:
                 f.write(content)
             report = pipeline.preflight_inspect(temp_path, original_filename=file.filename)
@@ -1744,7 +1796,7 @@ async def upload_and_process(
 
 @app.get("/{full_path:path}")
 async def serve_spa_fallback(full_path: str):
-    if full_path.startswith(("db", "hyperrag", "files", "settings", "databases", "docs", "openapi.json", "ws", "test-api", "ingestion")):
+    if full_path.startswith(("db", "hyperrag", "files", "settings", "databases", "docs", "openapi.json", "ws", "test-api", "ingestion", "health")):
         raise HTTPException(status_code=404, detail="Not Found")
     index_file = os.path.join(frontend_dist_dir, "index.html")
     if os.path.exists(index_file):

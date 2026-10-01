@@ -83,7 +83,7 @@ cd ../..
 ### Create Filesystem Junction for WebUI Database Discovery
 - **Windows PowerShell**:
   ```powershell
-  cmd /c mklink /J "D:\Rag\Hyper-RAG\hyperrag_cache\tsbc_maritime_test" "D:\Rag\Hyper-RAG\caches\tsbc_maritime_test"
+  cmd /c mklink /J ".\hyperrag_cache\tsbc_maritime_test" ".\caches\tsbc_maritime_test"
   ```
 - **Linux / macOS**:
   ```bash
@@ -140,7 +140,7 @@ python -m datasets.<dataset_name>.pipeline --dataset <dataset_name>_test_1 --max
 
 ### Directory Junction Creation Pattern
 ```powershell
-cmd /c mklink /J "D:\Rag\Hyper-RAG\hyperrag_cache\<dataset_name>_test" "D:\Rag\Hyper-RAG\caches\<dataset_name>_test"
+cmd /c mklink /J ".\hyperrag_cache\<dataset_name>_test" ".\caches\<dataset_name>_test"
 ```
 
 ### Run Custom Dataset Unit Tests

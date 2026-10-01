@@ -48,7 +48,7 @@ Each perspective is a self-contained factual paragraph (100–300 words) that in
 
 ## 3. The TSBC Implementation Case Study
 
-In our maritime pipeline ([datasets/tsbc_maritime/pipeline.py](file:///d:/Rag/Hyper-RAG/datasets/tsbc_maritime/pipeline.py)), we decomposed Occurrence 4 into 5 distinct perspectives:
+In our maritime pipeline ([datasets/tsbc_maritime/pipeline.py](../datasets/tsbc_maritime/pipeline.py)), we decomposed Occurrence 4 into 5 distinct perspectives:
 
 ### Perspective 1: `occurrence_overview`
 > "Maritime Occurrence ID 4 (Occurrence Number 4) was an official Fact-Finding investigation into an Accident involving an EXPLOSION. The incident occurred on 1975-01-08 at 19:00:00 UTC in the Laurentian Region. Nearest geographic location: ST LAWRENCE-GULF OF-RIVIERE AU RENARD-PRET DE at coordinates 49.0° N, 64.1667° W. Primary vessel involved: ANVOURGON. Summary: CREW RESCUED VESSEL TOWED TO HALIFAX AFTER FIRE IN ENGINE ROOM."

@@ -26,7 +26,7 @@ Active Runtime Errors:           0
 ## Appendix B: Adaptive Routing Reference
 
 ### Phase 1 Complexity Scoring Weights
-Defined in [`hyperrag/adaptive_router.py`](file:///d:/Rag/Hyper-RAG/hyperrag/adaptive_router.py#L28):
+Defined in [`hyperrag/adaptive_router.py`](../hyperrag/adaptive_router.py#L28):
 
 ```text
 Point Allocations:

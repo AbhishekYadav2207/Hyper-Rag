@@ -79,10 +79,10 @@ const DatabaseSelector: React.FC<DatabaseSelectorProps> = ({
                 value={storeGlobalUser.selectedDatabase}
                 onChange={handleDatabaseChange}
                 style={{ minWidth: 250 }}
-                placeholder={placeholder}
+                placeholder={placeholder || (storeGlobalUser.availableDatabases.length === 0 ? "No knowledge base yet" : defaultPlaceholder)}
                 size={size}
                 disabled={disabled}
-                loading={storeGlobalUser.availableDatabases.length === 0}
+                loading={storeGlobalUser.databasesLoading}
                 dropdownRender={(menu) => (
                     <div>
                         {menu}

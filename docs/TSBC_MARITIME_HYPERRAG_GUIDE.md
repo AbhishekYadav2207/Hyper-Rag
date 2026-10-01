@@ -10,7 +10,7 @@ The TSBC integration pipeline connects real Canadian maritime occurrence records
 
 ```text
 ┌────────────────────────────────────────────────────────┐
-│  D:\CAIR\TSBC-MaritimePipeline\outputs\maritime_corpus.jsonl │
+│  external_data/maritime_corpus.jsonl │
 │  (68,355 lines | 44,329 occurrences | Local & Read-Only)│
 └───────────────────────────┬────────────────────────────┘
                             │ (Local Parsing & Schema Discovery)
@@ -51,7 +51,7 @@ The TSBC integration pipeline connects real Canadian maritime occurrence records
 
 ## 2. Source Corpus Audit & Discovered Schema
 
-- **Corpus Location**: `D:\CAIR\TSBC-MaritimePipeline\outputs\maritime_corpus.jsonl`
+- **Corpus Location**: `external_data/maritime_corpus.jsonl`
 - **Total Lines**: 68,355 (100% valid JSON, 0 malformed records)
 - **Unique Occurrences**: 44,329
 - **Perspectives**:
@@ -94,7 +94,7 @@ Selection was performed using a deterministic 9-factor scoring function:
 
 ## 4. Normalization & Deduplication
 
-Implemented in [pipeline.py](file:///d:/Rag/Hyper-RAG/datasets/tsbc_maritime/pipeline.py):
+Implemented in [pipeline.py](../datasets/tsbc_maritime/pipeline.py):
 - **Equipment Deduplication**: Removes duplicate equipment entries (e.g., redundant Lifeboat and Magnetic Compass records) based on composite key tuples.
 - **Provenance Preservation**: Retains source file path, occurrence ID, vessel name, and original perspective identifiers.
 - **Context Generation**: Produces 5 clean, factual perspectives:
